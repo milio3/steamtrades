@@ -84,12 +84,25 @@ steamtrades/
 
 ### Opción A: Despliegue con Docker Compose (Recomendado)
 
+1. **Configurar variables (Opcional para producción / Raspberry Pi):**
+```bash
+cp .env.example .env
+```
+> **Despliegue en Raspberry Pi (DietPi):**
+> Edita `.env` y define la ruta persistente de DietPi:
+> ```env
+> DATA_PATH=/mnt/dietpi_userdata/steamtrades/data
+> FRONTEND_PORT=80
+> BACKEND_PORT=8000
+> ```
+
+2. **Levantar los servicios:**
 ```bash
 docker compose up --build -d
 ```
-* **Frontend:** `http://localhost`
+* **Frontend:** `http://localhost` (o la IP de tu Raspberry Pi)
 * **Vista Tabla:** `http://localhost/table`
-* **API REST:** `http://localhost:8000/docs`
+* **API REST Docs:** `http://localhost:8000/docs`
 
 ### Opción B: Ejecución Local en Entorno Virtual
 
