@@ -117,7 +117,7 @@ cp .env.example .env
 | :--- | :--- | :--- | :--- |
 | `DATA_PATH` | Ruta absoluta persistente en el host | `./data` | `/mnt/dietpi_userdata/apps/steamtrades/data` |
 | `FRONTEND_PORT` | Puerto HTTP del frontend | `8333` | `8333` |
-| `BACKEND_PORT` | Puerto HTTP del backend API | `8000` | `8000` |
+| `BACKEND_PORT` | Puerto HTTP del backend API | `8334` | `8334` |
 | `DEFAULT_TF2_STEAM_PRICE` | Cotización base Steam (€) | `2.02` | `2.02` |
 | `DEFAULT_TF2_CASH_PRICE` | Cotización base Cash (€) | `1.62` | `1.62` |
 | `DEFAULT_STEAM_FEE_PERCENT` | Comisión mercado Steam (%) | `13.03` | `13.03` |
@@ -143,7 +143,7 @@ docker compose up -d
 ## 8. Puertos
 
 * **Frontend (Nginx Web):** `8333` (Mapeado a `${FRONTEND_PORT:-8333}`)
-* **Backend (FastAPI REST API):** `8000` (Mapeado a `${BACKEND_PORT:-8000}`)
+* **Backend (FastAPI REST API):** `8334` (Mapeado a `${BACKEND_PORT:-8334}`)
 
 ---
 
@@ -262,7 +262,7 @@ docker compose down
 4. En **Environment variables**, añade:
    * `DATA_PATH=/mnt/dietpi_userdata/apps/steamtrades/data`
    * `FRONTEND_PORT=8333`
-   * `BACKEND_PORT=8000`
+   * `BACKEND_PORT=8334`
 5. Pulsa en **Deploy the stack**.
 
 ---

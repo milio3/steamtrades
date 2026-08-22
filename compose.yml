@@ -6,7 +6,7 @@ services:
     container_name: steamtrades-backend
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${BACKEND_PORT:-8334}:8000"
     volumes:
       - ${DATA_PATH:-/mnt/dietpi_userdata/apps/steamtrades/data}:/app/data
     environment:
