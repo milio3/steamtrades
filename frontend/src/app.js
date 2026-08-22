@@ -50,7 +50,10 @@ const editHistKeyshop = document.getElementById('edit-hist-keyshop');
 const editHistOfficial = document.getElementById('edit-hist-official');
 const editLotName = document.getElementById('edit-lot-name');
 const editIsSold = document.getElementById('edit-is-sold');
-const editSoldKeys = document.getElementById('edit-sold-keys');
+const editSoldCurrency = document.getElementById('edit-sold-currency');
+const editSoldPrice = document.getElementById('edit-sold-price');
+const editSoldCurrencyLabel = document.getElementById('edit-sold-currency-label');
+const editSoldNote = document.getElementById('edit-sold-note');
 const soldKeysContainer = document.getElementById('sold-keys-container');
 const soldBadge = document.getElementById('sold-badge');
 const editForm = document.getElementById('edit-form');
@@ -124,6 +127,17 @@ function setupEventListeners() {
     });
   }
 
+  if (editSoldCurrency) {
+    editSoldCurrency.addEventListener('change', () => {
+      const isEur = editSoldCurrency.value === 'EUR';
+      if (editSoldCurrencyLabel) editSoldCurrencyLabel.textContent = isEur ? '€' : 'TF2';
+      if (editSoldPrice) {
+        editSoldPrice.step = isEur ? '0.01' : '0.25';
+        editSoldPrice.placeholder = isEur ? '0.00' : '0.00';
+      }
+    });
+  }
+
   if (editIsSold) {
     editIsSold.addEventListener('change', () => {
       if (soldKeysContainer) {
@@ -131,9 +145,9 @@ function setupEventListeners() {
           soldKeysContainer.classList.remove('hidden');
           soldKeysContainer.classList.add('flex');
           if (soldBadge) soldBadge.classList.remove('hidden');
-          if (editSoldKeys && !editSoldKeys.value) {
+          if (editSoldPrice && !editSoldPrice.value) {
             const curGame = gamesData.find(g => g.id === selectedGameId);
-            if (curGame) editSoldKeys.value = curGame.tf2_keys_offered;
+            if (curGame) editSoldPrice.value = curGame.tf2_keys_offered;
           }
         } else {
           soldKeysContainer.classList.add('hidden');
@@ -371,9 +385,18 @@ function renderGamesGrid() {
       </span>
     ` : '';
 
+    let soldBadgeText = '';
+    if (game.is_sold) {
+      const isEur = game.sold_currency === 'EUR';
+      const priceVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || game.tf2_keys_offered);
+      const formattedPrice = isEur ? `${Number(priceVal).toFixed(2)} €` : `${priceVal} TF2`;
+      const noteSuffix = game.sold_note ? ` - ${escapeHtml(game.sold_note)}` : '';
+      soldBadgeText = `VENDIDO (${formattedPrice}${noteSuffix})`;
+    }
+
     const soldBadgeCard = game.is_sold ? `
-      <span class="bg-emerald-950/95 backdrop-blur border border-emerald-600 text-emerald-300 text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 shadow-md" title="Vendido por ${game.sold_tf2_keys || game.tf2_keys_offered} TF2">
-        <i class="fa-solid fa-check text-emerald-400 text-[8px]"></i> VENDIDO (${game.sold_tf2_keys || game.tf2_keys_offered} TF2)
+      <span class="bg-emerald-950/95 backdrop-blur border border-emerald-600 text-emerald-300 text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 shadow-md" title="${escapeHtml(soldBadgeText)}">
+        <i class="fa-solid fa-check text-emerald-400 text-[8px]"></i> ${soldBadgeText}
       </span>
     ` : '';
 
@@ -549,7 +572,16 @@ function openEditModal(gameId) {
   // Estado de vendido
   const isSold = !!game.is_sold;
   if (editIsSold) editIsSold.checked = isSold;
-  if (editSoldKeys) editSoldKeys.value = game.sold_tf2_keys || (isSold ? game.tf2_keys_offered : '');
+  
+  const curCurrency = game.sold_currency || 'TF2';
+  if (editSoldCurrency) editSoldCurrency.value = curCurrency;
+  if (editSoldCurrencyLabel) editSoldCurrencyLabel.textContent = curCurrency === 'EUR' ? '€' : 'TF2';
+  if (editSoldPrice) {
+    editSoldPrice.step = curCurrency === 'EUR' ? '0.01' : '0.25';
+    const initVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || (isSold ? game.tf2_keys_offered : ''));
+    editSoldPrice.value = initVal;
+  }
+  if (editSoldNote) editSoldNote.value = game.sold_note || '';
   
   if (soldKeysContainer) {
     if (isSold) {
@@ -581,7 +613,9 @@ async function saveModalData() {
   if (!selectedGameId) return;
 
   const isSold = editIsSold ? editIsSold.checked : false;
-  const soldKeys = isSold && editSoldKeys && editSoldKeys.value ? parseFloat(editSoldKeys.value) : null;
+  const soldCurr = editSoldCurrency ? editSoldCurrency.value : 'TF2';
+  const soldPriceVal = isSold && editSoldPrice && editSoldPrice.value ? parseFloat(editSoldPrice.value) : null;
+  const soldNoteVal = isSold && editSoldNote && editSoldNote.value.trim() ? editSoldNote.value.trim() : null;
   const lot = editLotName ? (editLotName.value.trim() || 'xMjalino') : 'xMjalino';
 
   const payload = {
@@ -591,7 +625,10 @@ async function saveModalData() {
     ggdeals_historical_keyshop_low: editHistKeyshop.value ? parseFloat(editHistKeyshop.value) : null,
     ggdeals_historical_official_low: editHistOfficial.value ? parseFloat(editHistOfficial.value) : null,
     is_sold: isSold,
-    sold_tf2_keys: soldKeys,
+    sold_currency: soldCurr,
+    sold_price: soldPriceVal,
+    sold_tf2_keys: soldCurr === 'TF2' ? soldPriceVal : null,
+    sold_note: soldNoteVal,
     lot_name: lot
   };
 

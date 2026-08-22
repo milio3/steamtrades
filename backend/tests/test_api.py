@@ -61,6 +61,29 @@ def test_get_game_not_found(client):
     response = client.get("/api/games/non_existent_game_12345")
     assert response.status_code == 404
 
+def test_sold_with_real_money_and_note(client):
+    res_games = client.get("/api/games")
+    games = res_games.json()
+    if len(games) > 0:
+        target_id = games[0]["id"]
+        payload = {
+            "is_sold": True,
+            "sold_currency": "EUR",
+            "sold_price": 4.50,
+            "sold_note": "Pago Paypal"
+        }
+        res_update = client.post(f"/api/games/{target_id}", json=payload)
+        assert res_update.status_code == 200
+        
+        # Verificar detalle
+        res_detail = client.get(f"/api/games/{target_id}")
+        assert res_detail.status_code == 200
+        game = res_detail.json()
+        assert game["is_sold"] is True
+        assert game["sold_currency"] == "EUR"
+        assert game["sold_price"] == 4.50
+        assert game["sold_note"] == "Pago Paypal"
+
 def test_bulk_state_update(client):
     res_games = client.get("/api/games")
     games = res_games.json()

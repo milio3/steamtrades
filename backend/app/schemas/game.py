@@ -22,6 +22,9 @@ class GameUpdatePayload(BaseModel):
     counter_increase_tf2: Optional[float] = None
     is_sold: Optional[bool] = None
     sold_tf2_keys: Optional[float] = None
+    sold_currency: Optional[str] = "TF2"
+    sold_price: Optional[float] = None
+    sold_note: Optional[str] = None
     lot_name: Optional[str] = None
 
 class GameOut(BaseModel):
@@ -69,6 +72,9 @@ class GameOut(BaseModel):
     counter_increase_tf2: float = 0.0
     is_sold: bool = False
     sold_tf2_keys: Optional[float] = None
+    sold_currency: Optional[str] = "TF2"
+    sold_price: Optional[float] = None
+    sold_note: Optional[str] = None
     lot_name: str = "xMjalino"
 
 class BulkStatePayload(BaseModel):

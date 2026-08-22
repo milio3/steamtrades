@@ -52,6 +52,9 @@ class Game(Base):
     counter_increase_tf2 = Column(Float, default=0.0)
     is_sold = Column(Boolean, default=False)
     sold_tf2_keys = Column(Float, nullable=True)
+    sold_currency = Column(String, default="TF2")  # 'TF2' o 'EUR'
+    sold_price = Column(Float, nullable=True)
+    sold_note = Column(String, nullable=True)  # Ej: 'Pago Paypal'
     
     # Lote asignado
     lot_name = Column(String, default="xMjalino", index=True)

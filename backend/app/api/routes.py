@@ -205,8 +205,18 @@ def update_game(game_id: str, payload: GameUpdatePayload, db: Session = Depends(
         game.counter_increase_tf2 = payload.counter_increase_tf2
     if payload.is_sold is not None:
         game.is_sold = payload.is_sold
-    if payload.sold_tf2_keys is not None:
+    if payload.sold_currency is not None:
+        game.sold_currency = payload.sold_currency
+    if payload.sold_price is not None:
+        game.sold_price = payload.sold_price
+        if game.sold_currency == "TF2":
+            game.sold_tf2_keys = payload.sold_price
+    elif payload.sold_tf2_keys is not None:
         game.sold_tf2_keys = payload.sold_tf2_keys
+        if game.sold_price is None:
+            game.sold_price = payload.sold_tf2_keys
+    if payload.sold_note is not None:
+        game.sold_note = payload.sold_note.strip() if payload.sold_note else None
     if payload.lot_name is not None:
         game.lot_name = payload.lot_name.strip() or "xMjalino"
     if payload.steam_app_id is not None and payload.steam_app_id > 0:

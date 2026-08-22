@@ -6,9 +6,30 @@ from backend.app.db.session import engine, Base, SessionLocal
 from backend.app.models.game import Game
 from backend.app.models.settings import MarketSettingsModel
 
+def migrate_columns():
+    """Migración ligera para SQLite que añade nuevas columnas si la tabla ya existía"""
+    with engine.connect() as conn:
+        # Comprobar columnas existentes en la tabla games
+        try:
+            result = conn.exec_driver_sql("PRAGMA table_info(games)")
+            existing_cols = {row[1] for row in result.fetchall()}
+            
+            if existing_cols:
+                if "sold_currency" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE games ADD COLUMN sold_currency VARCHAR DEFAULT 'TF2'")
+                if "sold_price" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE games ADD COLUMN sold_price FLOAT")
+                if "sold_note" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE games ADD COLUMN sold_note VARCHAR")
+                if "lot_name" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE games ADD COLUMN lot_name VARCHAR DEFAULT 'xMjalino'")
+        except Exception:
+            pass
+
 def init_database():
     """Crea las tablas SQLite e inicializa los datos migrando desde games_db.json si la base de datos está vacía."""
     Base.metadata.create_all(bind=engine)
+    migrate_columns()
     db: Session = SessionLocal()
     
     try:
@@ -88,6 +109,9 @@ def init_database():
                         counter_increase_tf2=float(g.get("counter_increase_tf2", 0.0) or 0.0),
                         is_sold=bool(g.get("is_sold", False)),
                         sold_tf2_keys=g.get("sold_tf2_keys"),
+                        sold_currency=g.get("sold_currency", "TF2") or "TF2",
+                        sold_price=g.get("sold_price") or g.get("sold_tf2_keys"),
+                        sold_note=g.get("sold_note"),
                         lot_name=g.get("lot_name", "xMjalino") or "xMjalino"
                     )
                     db.add(game_obj)
