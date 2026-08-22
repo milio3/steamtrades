@@ -3,25 +3,32 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: steamtrades_backend
+    container_name: steamtrades-backend
     restart: unless-stopped
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ${DATA_PATH:-./data}:/app/data
+      - ${DATA_PATH:-/mnt/dietpi_userdata/apps/steamtrades/data}:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/steamkeys.db
-      - DEFAULT_TF2_STEAM_PRICE=2.02
-      - DEFAULT_TF2_CASH_PRICE=1.62
-      - DEFAULT_STEAM_FEE_PERCENT=13.03
+      - DEFAULT_TF2_STEAM_PRICE=${DEFAULT_TF2_STEAM_PRICE:-2.02}
+      - DEFAULT_TF2_CASH_PRICE=${DEFAULT_TF2_CASH_PRICE:-1.62}
+      - DEFAULT_STEAM_FEE_PERCENT=${DEFAULT_STEAM_FEE_PERCENT:-13.03}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: steamtrades_frontend
+    container_name: steamtrades-frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-80}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy

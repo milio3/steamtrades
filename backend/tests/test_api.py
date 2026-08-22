@@ -12,6 +12,16 @@ def client():
     with TestClient(app) as c:
         yield c
 
+def test_health_check(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+def test_api_health_check(client):
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
 def test_get_summary(client):
     response = client.get("/api/summary")
     assert response.status_code == 200

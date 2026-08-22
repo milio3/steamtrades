@@ -12,6 +12,26 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Configuración y Secretos
+.env
+
+# Bases de Datos Persistentes (los datos no se suben a Git)
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Almacenamiento Efímero / Persistente
+uploads/
+backups/
+logs/
+*.log
+
+# Node / Frontend
+node_modules/
+
 # IDEs y Editores
 .vscode/
 .idea/
@@ -25,8 +45,8 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 
-# Archivos Temporales de desarrollo
-*.log
+# Archivos de desarrollo / Guía interna
+guia_proyectos_fastapi_docker_rpi.md
 data/sample_ggdeals.html
 data/missing_report.json
 data/final_audit.json

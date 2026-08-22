@@ -26,6 +26,10 @@ from backend.app.services.price_service import (
 
 router = APIRouter(prefix="/api", tags=["Steam Keys"])
 
+@router.get("/health", tags=["Health"])
+def api_health_check():
+    return {"status": "ok"}
+
 sync_status = {
     "is_syncing": False,
     "current": 0,

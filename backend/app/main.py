@@ -29,6 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Endpoint de Healthcheck (según directivas de despliegue)
+@app.get("/health", tags=["Health"])
+def health_check():
+    return {"status": "ok"}
+
 # Incluir Rutas de API REST
 app.include_router(router)
 
