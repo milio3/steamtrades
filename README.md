@@ -116,7 +116,7 @@ cp .env.example .env
 | Variable | Descripción | Valor por defecto (Local) | Valor Producción (DietPi) |
 | :--- | :--- | :--- | :--- |
 | `DATA_PATH` | Ruta absoluta persistente en el host | `./data` | `/mnt/dietpi_userdata/apps/steamtrades/data` |
-| `FRONTEND_PORT` | Puerto HTTP del frontend | `80` | `80` |
+| `FRONTEND_PORT` | Puerto HTTP del frontend | `8333` | `8333` |
 | `BACKEND_PORT` | Puerto HTTP del backend API | `8000` | `8000` |
 | `DEFAULT_TF2_STEAM_PRICE` | Cotización base Steam (€) | `2.02` | `2.02` |
 | `DEFAULT_TF2_CASH_PRICE` | Cotización base Cash (€) | `1.62` | `1.62` |
@@ -142,7 +142,7 @@ docker compose up -d
 
 ## 8. Puertos
 
-* **Frontend (Nginx Web):** `80` (Mapeado a `${FRONTEND_PORT:-80}`)
+* **Frontend (Nginx Web):** `8333` (Mapeado a `${FRONTEND_PORT:-8333}`)
 * **Backend (FastAPI REST API):** `8000` (Mapeado a `${BACKEND_PORT:-8000}`)
 
 ---
@@ -261,7 +261,7 @@ docker compose down
    * Compose path: `compose.yml`
 4. En **Environment variables**, añade:
    * `DATA_PATH=/mnt/dietpi_userdata/apps/steamtrades/data`
-   * `FRONTEND_PORT=80`
+   * `FRONTEND_PORT=8333`
    * `BACKEND_PORT=8000`
 5. Pulsa en **Deploy the stack**.
 
