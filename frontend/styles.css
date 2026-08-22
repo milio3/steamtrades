@@ -1,0 +1,98 @@
+/* Estilos personalizados */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Tarjetas estáticas (Sin movimiento en hover, solo halo de borde y sombra suave) */
+.game-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.game-card:hover {
+  border-color: rgba(100, 116, 139, 0.6);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6);
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Estados activos visibles y claros para filtros (Sin colores cyan) */
+.filter-btn {
+  transition: all 0.2s ease;
+}
+
+.filter-btn.active {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+  border-color: #64748b !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+}
+
+#filter-delisted.active {
+  background-color: rgba(76, 5, 25, 0.8) !important;
+  color: #fecdd3 !important;
+  border-color: #be123c !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(244, 63, 94, 0.4);
+}
+
+#filter-huge-margin.active {
+  background-color: rgba(69, 26, 3, 0.8) !important;
+  color: #fde68a !important;
+  border-color: #b45309 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(245, 158, 11, 0.4);
+}
+
+#filter-sold.active {
+  background-color: rgba(6, 78, 59, 0.85) !important;
+  color: #a7f3d0 !important;
+  border-color: #059669 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(16, 185, 129, 0.4);
+}
+
+/* Cabeceras de tabla ordenables */
+th.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+th.sortable-th:hover {
+  background-color: rgba(30, 41, 59, 0.7) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}

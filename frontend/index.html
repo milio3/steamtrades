@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Keys Valuation & Arbitrage | Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-slate-700 selection:text-white pb-28">
+
+  <!-- Encabezado Unificado (Idéntico en Tarjetas y Tabla) -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-[1650px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Identidad y Título -->
+      <div class="flex items-center space-x-3">
+        <a href="/" class="p-2 bg-slate-800 border border-slate-700 rounded-xl hover:bg-slate-700 transition">
+          <i class="fa-brands fa-steam text-lg text-slate-300"></i>
+        </a>
+        <div>
+          <h1 class="text-base font-bold tracking-tight text-slate-100">
+            Steam Keys Valuation & Arbitrage
+          </h1>
+          <p class="text-xs text-slate-400">Análisis de ofertas, rentabilidad y generador de contraofertas</p>
+        </div>
+      </div>
+
+      <!-- Contenedor Común Oscuro Unificado (Vistas, Cotización TF2 y Añadir Juego) -->
+      <div class="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-2 text-xs flex-wrap">
+        <!-- Selector de Vistas -->
+        <div class="flex items-center gap-1">
+          <a href="/" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 font-semibold flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-grip text-slate-300"></i> Tarjetas
+          </a>
+          <a href="/table" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition flex items-center gap-1.5 font-medium">
+            <i class="fa-solid fa-table-list"></i> Tabla
+          </a>
+        </div>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+        <!-- Cotización TF2 en vivo -->
+        <div class="flex items-center gap-2 px-2 py-1 text-xs">
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-500/80"></span>
+          <span class="text-slate-400">TF2 Key:</span>
+          <span id="tf2-live-badge" class="font-bold text-slate-200">1.97 €</span>
+          <span class="text-slate-600">|</span>
+          <span id="tf2-cash-badge" class="font-bold text-slate-300">1.58 €</span>
+        </div>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+        <!-- Botón Añadir Juego -->
+        <button id="btn-open-add-modal" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 hover:border-slate-600 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-plus text-slate-300"></i>
+          <span>Añadir juego</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido Principal -->
+  <main class="max-w-[1650px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-1 space-y-4">
+    
+    <!-- Barra de progreso de sincronización (Exclusiva de Tarjetas) -->
+    <div id="sync-progress-bar" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-3 text-xs text-slate-300 flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-2.5">
+        <i class="fa-solid fa-spinner fa-spin text-slate-400"></i>
+        <span id="sync-progress-msg">Sincronizando con Steam Store y GG.deals...</span>
+      </div>
+      <div class="w-48 bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+        <div id="sync-progress-fill" class="bg-slate-500 h-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Barra de Filtros, Búsqueda y Actualización de Precios -->
+    <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
+      <!-- Buscador -->
+      <div class="relative w-full sm:w-64 flex-shrink-0">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+        <input id="search-input" type="text" placeholder="Buscar juego..." 
+               class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 transition">
+      </div>
+
+      <!-- Filtros Rápidos (Estados activos claros) -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="filter-all" class="filter-btn active px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 text-slate-300 transition">
+          Todos (<span id="stat-total-games-pill">107</span>)
+        </button>
+        <button id="filter-delisted" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-300 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-triangle-exclamation text-rose-400/80"></i>
+          <span>Deslistados (<span id="count-delisted">0</span>)</span>
+        </button>
+        <button id="filter-huge-margin" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 text-slate-400 hover:text-amber-300 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrow-trend-down text-rose-400/80"></i>
+          <span>Mayor Pérdida (> 40%)</span>
+        </button>
+        <button id="filter-sold" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 border border-slate-700 text-slate-400 hover:text-emerald-300 transition flex items-center gap-1.5" title="Ver juegos marcados como vendidos">
+          <i class="fa-solid fa-check text-emerald-400/80"></i>
+          <span>Vendidos (<span id="count-sold">0</span>)</span>
+        </button>
+      </div>
+
+      <!-- Selector de Ordenación y Botón Actualizar Precios -->
+      <div class="flex items-center gap-2 flex-shrink-0 ml-auto lg:ml-0 flex-wrap">
+        <span class="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap">
+          <i class="fa-solid fa-arrow-down-wide-short text-slate-400"></i> Ordenar:
+        </span>
+        <select id="sort-select" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-slate-500 cursor-pointer">
+          <option value="loss_desc">Mayor Dinero Dejado de Ganar (€)</option>
+          <option value="loss_pct_desc">Mayor Descuento al Reseller (% bajo suelo)</option>
+          <option value="loss_asc">Mejores Ofertas (Pagan sobre suelo)</option>
+          <option value="floor_desc">Suelo de Mercado más Alto (€)</option>
+          <option value="tf2_desc">Oferta TF2 Keys (Mayor a Menor)</option>
+          <option value="tf2_asc">Oferta TF2 Keys (Menor a Mayor)</option>
+          <option value="name_asc">Nombre del Juego (A - Z)</option>
+        </select>
+
+        <!-- Botón Actualizar Precios (Dentro del panel de tarjetas) -->
+        <button id="btn-sync-steam" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl font-medium text-xs flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-rotate text-slate-400"></i>
+          <span>Actualizar Precios</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista / Cuadrícula de Fichas (4 tarjetas por fila) -->
+    <div id="games-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <!-- Fichas renderizadas dinámicamente -->
+    </div>
+  </main>
+
+  <!-- Barra Flotante Inferior de Estadísticas & Totales (Métricas en el Footer) -->
+  <aside class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-xl z-40 py-2.5">
+    <div class="max-w-[1650px] w-full mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full">
+        
+        <!-- Total Juegos -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-gamepad text-slate-400"></i> Total Juegos
+            </span>
+            <div class="flex items-baseline gap-1 mt-0.5 font-mono">
+              <span id="stat-total-games" class="text-base font-black text-white">--</span>
+              <span class="text-[10px] text-slate-500 font-sans font-medium">claves</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Oferta en TF2 -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-key text-amber-400"></i> Oferta en TF2
+            </span>
+            <div class="flex items-baseline gap-1 mt-0.5 font-mono">
+              <span id="stat-total-keys" class="text-base font-black text-amber-400">--</span>
+              <span class="text-[10px] text-amber-400/70 font-sans font-medium">keys</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saldo Steam -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-brands fa-steam text-slate-400"></i> Saldo Steam
+            </span>
+            <div class="mt-0.5 font-mono">
+              <span id="stat-steam-value" class="text-base font-black text-white">-- €</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dinero Real (Cash) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-money-bill-wave text-emerald-400"></i> Dinero Real (Cash)
+            </span>
+            <div class="mt-0.5 font-mono">
+              <span id="stat-cash-value" class="text-base font-black text-emerald-400">-- €</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suelo Mínimo Total -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-chart-line text-blue-400"></i> Suelo Mínimo Total
+            </span>
+            <div class="mt-0.5 font-mono">
+              <span id="stat-market-value" class="text-base font-black text-white">-- €</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dejas de Ganar (Lote) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+          <div>
+            <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrow-trend-down text-rose-400"></i> Dejas de Ganar (Lote)
+            </span>
+            <div class="mt-0.5 font-mono">
+              <span id="stat-reseller-profit" class="text-base font-black text-rose-400">-- €</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </aside>
+
+  <!-- Modal para Añadir Nuevo Juego por Link de Steam -->
+  <div id="modal-add-game" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl shadow-2xl p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-brands fa-steam text-slate-300 text-xl"></i>
+          <h3 class="font-bold text-sm text-slate-100">Añadir Juego por Link de Steam</h3>
+        </div>
+        <button id="btn-close-add-modal" class="text-slate-400 hover:text-slate-200 text-lg">&times;</button>
+      </div>
+      
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">URL de la Tienda de Steam:</label>
+          <input id="input-steam-url" type="url" placeholder="https://store.steampowered.com/app/620/Portal_2/" 
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono">
+          <p class="text-[11px] text-slate-500 mt-1">Se extraerán automáticamente precios, datos de GG.deals, estado y jugadores 24h.</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Oferta Inicial (TF2):</label>
+            <input id="input-tf2-keys" type="number" step="0.25" min="0" value="1.0" 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Lote / Paquete:</label>
+            <input id="input-lot-name" type="text" placeholder="Ej: Lote_Agosto, xMjalino..." 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <button id="btn-cancel-add" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs transition">Cancelar</button>
+        <button id="btn-submit-add" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-md">
+          <i class="fa-solid fa-plus"></i> Añadir y Calcular
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Edición de Juego (Con Imagen, AppID, URL de Steam, Lote y Guardar Destacado) -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+      
+      <!-- Cabecera del Modal con Miniatura y AppID -->
+      <div class="flex justify-between items-start border-b border-slate-800 pb-3.5">
+        <div class="flex items-center gap-3">
+          <img id="modal-game-img" src="" alt="" class="w-12 h-6 object-cover rounded-md border border-slate-700 flex-shrink-0 shadow-sm">
+          <div>
+            <h3 id="modal-game-title" class="font-bold text-sm sm:text-base text-slate-100 line-clamp-1">Nombre del Juego</h3>
+            <span id="modal-game-appid" class="text-[10px] text-slate-400 font-mono font-medium block mt-0.5">AppID: --</span>
+          </div>
+        </div>
+        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-200 transition p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="edit-form" class="space-y-3.5 text-xs">
+        <input type="hidden" id="edit-game-id">
+
+        <!-- URL de Steam -->
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">URL de la Tienda de Steam:</label>
+          <input id="edit-steam-url" type="url" placeholder="https://store.steampowered.com/app/..." 
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Oferta Recibida (TF2):</label>
+            <input id="edit-tf2-keys" type="number" step="0.25" min="0" 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-sm focus:outline-none focus:border-slate-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Lote / Paquete:</label>
+            <input id="edit-lot-name" type="text" placeholder="xMjalino" 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-sm focus:outline-none focus:border-slate-500">
+          </div>
+        </div>
+
+        <!-- Precios Actuales -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Precio Actual Oficial (€):</label>
+            <input id="edit-official-price" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Precio Actual Keyshops (€):</label>
+            <input id="edit-keyshop-price" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+        </div>
+
+        <!-- Mínimos Históricos -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Mínimo Histórico Oficial (€):</label>
+            <input id="edit-hist-official" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">Mínimo Histórico Keyshops (€):</label>
+            <input id="edit-hist-keyshop" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+          </div>
+        </div>
+
+        <!-- Estado de Venta / Transacción Cerrada -->
+        <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-2.5">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" id="edit-is-sold" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer">
+              <span class="font-bold text-slate-200 text-xs">Marcar juego como VENDIDO</span>
+            </label>
+            <span id="sold-badge" class="hidden text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded font-bold">
+              <i class="fa-solid fa-check"></i> VENDIDO
+            </span>
+          </div>
+
+          <div id="sold-keys-container" class="hidden pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
+            <label class="text-slate-400 font-semibold text-xs">Precio final acordado:</label>
+            <div class="flex items-center gap-1.5">
+              <input id="edit-sold-keys" type="number" step="0.25" min="0" placeholder="0.00" 
+                     class="w-28 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500">
+              <span class="text-slate-400 font-bold text-xs">TF2</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2">
+          <button type="button" id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-medium transition">Cancelar</button>
+          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition shadow-md hover:shadow-blue-600/30 flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
