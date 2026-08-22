@@ -385,18 +385,9 @@ function renderGamesGrid() {
       </span>
     ` : '';
 
-    let soldBadgeText = '';
-    if (game.is_sold) {
-      const isEur = game.sold_currency === 'EUR';
-      const priceVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || game.tf2_keys_offered);
-      const formattedPrice = isEur ? `${Number(priceVal).toFixed(2)} €` : `${priceVal} TF2`;
-      const noteSuffix = game.sold_note ? ` - ${escapeHtml(game.sold_note)}` : '';
-      soldBadgeText = `VENDIDO (${formattedPrice}${noteSuffix})`;
-    }
-
     const soldBadgeCard = game.is_sold ? `
-      <span class="bg-emerald-950/95 backdrop-blur border border-emerald-600 text-emerald-300 text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 shadow-md" title="${escapeHtml(soldBadgeText)}">
-        <i class="fa-solid fa-check text-emerald-400 text-[8px]"></i> ${soldBadgeText}
+      <span class="bg-emerald-950/95 backdrop-blur border border-emerald-600 text-emerald-300 text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 shadow-md" title="Juego vendido">
+        <i class="fa-solid fa-check text-emerald-400 text-[8px]"></i> VENDIDO
       </span>
     ` : '';
 
@@ -435,6 +426,116 @@ function renderGamesGrid() {
 
     const offerSteamEur = (typeof game.offer_value_steam_eur === 'number') ? game.offer_value_steam_eur : 0;
     const offerCashEur = (typeof game.offer_value_cash_eur === 'number') ? game.offer_value_cash_eur : 0;
+
+    // Sección Central: Panel Unificado de Venta vs Tabla de Precios
+    let centralContentHtml = '';
+
+    if (game.is_sold) {
+      const isSoldEur = game.sold_currency === 'EUR';
+      const priceVal = game.sold_price !== null && game.sold_price !== undefined ? Number(game.sold_price) : Number(game.sold_tf2_keys || game.tf2_keys_offered);
+      const noteText = game.sold_note ? escapeHtml(game.sold_note) : '';
+
+      let priceDisplay = '';
+      let conversionDisplay = '';
+      let soldEur = 0;
+
+      if (isSoldEur) {
+        soldEur = priceVal;
+        priceDisplay = `${soldEur.toFixed(2)} €`;
+        const equivKeysCash = tf2CashPrice > 0 ? (soldEur / tf2CashPrice) : 0;
+        conversionDisplay = `~${equivKeysCash.toFixed(2)} TF2 (Cash)`;
+      } else {
+        const soldKeys = priceVal;
+        priceDisplay = `${soldKeys} TF2`;
+        soldEur = soldKeys * tf2CashPrice;
+        const soldSteamEur = soldKeys * tf2SteamPrice;
+        conversionDisplay = `~${soldEur.toFixed(2)}€ Cash | ~${soldSteamEur.toFixed(2)}€ Steam`;
+      }
+
+      const floorPrice = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : 0;
+      const profitEur = soldEur - floorPrice;
+      const profitPct = floorPrice > 0 ? ((profitEur / floorPrice) * 100) : 0;
+      const isFavorable = profitEur >= 0;
+
+      centralContentHtml = `
+        <!-- Panel Unificado de Venta & Rentabilidad -->
+        <div class="bg-slate-950/90 border ${isFavorable ? 'border-emerald-800/60' : 'border-rose-800/60'} rounded-xl p-3 flex-1 flex flex-col justify-between space-y-2.5 shadow-sm">
+          <!-- Cabecera de Venta -->
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div>
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Precio de Venta</span>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="text-base font-black text-emerald-400 font-mono">${priceDisplay}</span>
+                ${noteText ? `<span class="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1" title="Nota: ${noteText}"><i class="fa-solid fa-receipt text-[9px] text-emerald-400"></i> ${noteText}</span>` : ''}
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Valor al Cambio</span>
+              <span class="text-[11px] font-mono font-semibold text-slate-200 mt-0.5 block">${conversionDisplay}</span>
+            </div>
+          </div>
+
+          <!-- Resultado sobre Suelo & % Profit -->
+          <div class="${isFavorable ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border border-rose-800/50 text-rose-300'} p-2 rounded-lg flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-1.5 font-bold text-[11px]">
+                <i class="fa-solid ${isFavorable ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400'}"></i>
+                <span>${isFavorable ? 'Trato Favorable' : 'Trato Desfavorable'}</span>
+              </div>
+              <div class="text-[9px] text-slate-400 font-mono mt-0.5">
+                Suelo: ${floorPrice.toFixed(2)}€
+              </div>
+            </div>
+            <div class="text-right font-mono">
+              <span class="text-xs font-black ${isFavorable ? 'text-emerald-300' : 'text-rose-300'} block">
+                ${isFavorable ? '+' : ''}${profitEur.toFixed(2)} € sobre suelo
+              </span>
+              <span class="text-[10px] font-black ${isFavorable ? 'text-emerald-400' : 'text-rose-400'} block">
+                ${isFavorable ? '+' : ''}${profitPct.toFixed(1)}% Profit
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      centralContentHtml = `
+        <!-- Tabla Unificada Transpuesta: Actual vs Mínimo con columna dedicada de Descuento -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-xs space-y-1.5">
+          <!-- Cabecera de 4 columnas -->
+          <div class="grid grid-cols-4 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 pb-1">
+            <span>Tipo</span>
+            <span class="text-center">Oficial</span>
+            <span class="text-center">Keyshops</span>
+            <span class="text-right">Dto.</span>
+          </div>
+
+          <!-- Fila Actual -->
+          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
+            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans">Actual</span>
+            <span class="text-center font-bold text-white">${curOfficialStr}</span>
+            <span class="text-center font-bold text-slate-200">${curKeyshopStr}</span>
+            <div class="text-right">
+              ${curKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${curKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
+            </div>
+          </div>
+
+          <!-- Fila Mínimo Histórico -->
+          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
+            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans" title="Mínimo Histórico">Mínimo</span>
+            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_official_time || ''}">${histOfficialStr}</span>
+            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_keyshop_time || ''}">${histKeyshopStr}</span>
+            <div class="text-right">
+              ${histKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${histKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Rentabilidad y Suelo de Mercado -->
+        <div>
+          ${lossBadgeHtml}
+        </div>
+      `;
+    }
 
     card.innerHTML = `
       <!-- Banner / Imagen Clickable para Editar con Halo Sutil -->
@@ -482,41 +583,8 @@ function renderGamesGrid() {
           </div>
         </div>
 
-        <!-- Tabla Unificada Transpuesta: Actual vs Mínimo con columna dedicada de Descuento -->
-        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-xs space-y-1.5">
-          <!-- Cabecera de 4 columnas -->
-          <div class="grid grid-cols-4 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 pb-1">
-            <span>Tipo</span>
-            <span class="text-center">Oficial</span>
-            <span class="text-center">Keyshops</span>
-            <span class="text-right">Dto.</span>
-          </div>
-
-          <!-- Fila Actual -->
-          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans">Actual</span>
-            <span class="text-center font-bold text-white">${curOfficialStr}</span>
-            <span class="text-center font-bold text-slate-200">${curKeyshopStr}</span>
-            <div class="text-right">
-              ${curKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${curKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
-            </div>
-          </div>
-
-          <!-- Fila Mínimo Histórico -->
-          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans" title="Mínimo Histórico">Mínimo</span>
-            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_official_time || ''}">${histOfficialStr}</span>
-            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_keyshop_time || ''}">${histKeyshopStr}</span>
-            <div class="text-right">
-              ${histKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${histKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
-            </div>
-          </div>
-        </div>
-
-        <!-- Rentabilidad y Suelo de Mercado (Padding homogéneo) -->
-        <div>
-          ${lossBadgeHtml}
-        </div>
+        <!-- Sección Central Dinámica (Vendido vs Precios) -->
+        ${centralContentHtml}
 
         <!-- Barra Inferior de Enlaces y Jugadores en 24h a la Izquierda -->
         <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
