@@ -622,11 +622,11 @@ function checkSyncStatusLoop() {
     try {
       const res = await fetch('/api/sync-status');
       const status = await res.json();
-      if (status.is_running) {
+      if (status.is_syncing) {
         if (syncProgressBar) syncProgressBar.classList.remove('hidden');
-        if (syncProgressMsg) syncProgressMsg.textContent = `Sincronizando: ${status.processed_games} / ${status.total_games} (${status.current_game || ''})`;
+        if (syncProgressMsg) syncProgressMsg.textContent = status.message || 'Sincronizando...';
         if (syncProgressFill) {
-          const pct = (status.processed_games / Math.max(1, status.total_games)) * 100;
+          const pct = (status.current / Math.max(1, status.total)) * 100;
           syncProgressFill.style.width = `${pct}%`;
         }
       } else {

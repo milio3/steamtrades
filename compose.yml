@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: steamtrades_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/steamkeys.db
+      - DEFAULT_TF2_STEAM_PRICE=2.02
+      - DEFAULT_TF2_CASH_PRICE=1.62
+      - DEFAULT_STEAM_FEE_PERCENT=13.03
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: steamtrades_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

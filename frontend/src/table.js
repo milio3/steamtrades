@@ -1,7 +1,7 @@
 // Estado de la tabla de contraoferta
 let games = [];
-let tf2CashPrice = 1.58;
-let tf2SteamPrice = 1.97;
+let tf2CashPrice = 1.62;
+let tf2SteamPrice = 2.02;
 let keyIncreases = {}; // Map: gameId -> float (incremento de llaves)
 let reviewedMap = {};  // Map: gameId -> boolean (estado revisado)
 let selectedGameId = null;
@@ -38,6 +38,7 @@ const btnCancelAdd = document.getElementById('btn-cancel-add');
 const btnSubmitAdd = document.getElementById('btn-submit-add');
 const inputSteamUrl = document.getElementById('input-steam-url');
 const inputTf2Keys = document.getElementById('input-tf2-keys');
+const inputLotName = document.getElementById('input-lot-name');
 
 // Modal de Edición de Juego
 const editModal = document.getElementById('edit-modal');
@@ -615,8 +616,6 @@ function handleIncreaseInput(gameId, value) {
   
   saveStoredData();
   calculateTotals();
-  
-  // Actualizar solo las celdas reactivas de esta fila sin destruir el DOM ni perder el foco
   updateRowCells(gameId);
 }
 
