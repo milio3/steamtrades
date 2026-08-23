@@ -17,6 +17,9 @@ RUN echo 'server { \
         root /usr/share/nginx/html; \
         try_files /table.html =404; \
     } \
+    location = /favicon.ico { \
+        alias /usr/share/nginx/html/static/favicon.svg; \
+    } \
     location /static/ { \
         alias /usr/share/nginx/html/static/; \
     } \

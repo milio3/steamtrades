@@ -48,3 +48,10 @@ if FRONTEND_SRC_DIR.exists():
     @app.get("/table", include_in_schema=False)
     def serve_table_view():
         return FileResponse(FRONTEND_SRC_DIR / "table.html")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def serve_favicon():
+        fav = FRONTEND_SRC_DIR / "favicon.svg"
+        if fav.exists():
+            return FileResponse(fav, media_type="image/svg+xml")
+        return FileResponse(FRONTEND_SRC_DIR / "index.html")
