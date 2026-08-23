@@ -9,7 +9,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 FRONTEND_SRC_DIR = BASE_DIR / "frontend" / "src"
 
 # Configuración de base de datos SQLite
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'steamkeys.db'}")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'steamtrades.db'}")
 
 # Configuración de mercado por defecto
 DEFAULT_TF2_STEAM_PRICE = float(os.getenv("DEFAULT_TF2_STEAM_PRICE", "2.02"))

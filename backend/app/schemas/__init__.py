@@ -1,19 +1,17 @@
 from backend.app.schemas.game import (
-    GameBase,
-    GameCreate,
+    AddGamePayload,
     GameUpdatePayload,
     GameOut,
+    OfferOut,
     BulkStatePayload,
-    MarketSummary,
-    AddGamePayload
+    MarketSummary
 )
 
 __all__ = [
-    "GameBase",
-    "GameCreate",
+    "AddGamePayload",
     "GameUpdatePayload",
     "GameOut",
+    "OfferOut",
     "BulkStatePayload",
-    "MarketSummary",
-    "AddGamePayload"
+    "MarketSummary"
 ]

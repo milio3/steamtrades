@@ -1,9 +1,11 @@
 import re
 import requests
+from datetime import datetime
 from typing import Dict, Any, Optional
 from bs4 import BeautifulSoup
 from backend.app.core.config import BROWSER_HEADERS
 from backend.app.models.game import Game
+from backend.app.models.offer import Offer
 from backend.app.models.settings import MarketSettingsModel
 from backend.app.services.steam_service import (
     fetch_steam_app_details,
@@ -21,72 +23,87 @@ def clean_game_slug(name: str) -> str:
     slug = re.sub(r'\s+', '-', slug).strip('-')
     return slug
 
-def recalculate_game_offer(game: Game, settings: MarketSettingsModel):
-    """Calcula el valor neto de la oferta recibida, suelo de mercado y margen de arbitraje."""
+def calculate_offer_metrics(offer: Offer, game: Optional[Game], settings: Optional[MarketSettingsModel]) -> Dict[str, Any]:
+    """Calcula dinámicamente en memoria las métricas de suelo, conversión de divisas y márgenes de arbitraje."""
     tf2_steam = settings.tf2_key_steam_price if settings else 2.02
     tf2_cash = settings.tf2_key_cash_price if settings else 1.62
     
-    # 1. Valor neto recibido en TF2
-    game.offer_value_steam_eur = round(game.tf2_keys_offered * tf2_steam, 2)
-    game.offer_value_cash_eur = round(game.tf2_keys_offered * tf2_cash, 2)
-    
-    # 2. Determinar Suelo Mínimo de Mercado (Floor Price)
+    # 1. Valor al cambio de la oferta recibida
+    offer_p = offer.offer_price or 0.0
+    if offer.offer_currency == "EUR":
+        offer_value_cash_eur = round(offer_p, 2)
+        offer_value_steam_eur = round(offer_p, 2)
+    else:
+        offer_value_steam_eur = round(offer_p * tf2_steam, 2)
+        offer_value_cash_eur = round(offer_p * tf2_cash, 2)
+        
+    # 2. Determinar Suelo Mínimo de Mercado (Floor Price) ignorando valores <= 0€
     floor_candidates = []
     
-    # Candidato 1: Keyshop actual
-    if game.ggdeals_current_keyshop and game.ggdeals_current_keyshop > 0.05:
-        floor_candidates.append((game.ggdeals_current_keyshop, "Keyshops (Actual)"))
-    elif game.best_keyshop_price_eur and game.best_keyshop_price_eur > 0.05:
-        floor_candidates.append((game.best_keyshop_price_eur, "Keyshops (Actual)"))
-        
-    # Candidato 2: Mínimo histórico en Keyshops
-    if game.ggdeals_historical_keyshop_low and game.ggdeals_historical_keyshop_low > 0.05:
-        floor_candidates.append((game.ggdeals_historical_keyshop_low, "Mín. Histórico Keyshops"))
-        
-    # Candidato 3: Mínimo histórico en tiendas Oficiales (si no es gratuito)
-    if game.ggdeals_historical_official_low and game.ggdeals_historical_official_low > 0.10:
-        floor_candidates.append((game.ggdeals_historical_official_low, "Mín. Histórico Oficial"))
-        
-    # Candidato 4: Precio oficial actual (solo si no hay ningún precio de keyshops)
-    if not floor_candidates and game.ggdeals_current_official and game.ggdeals_current_official > 0.05:
-        floor_candidates.append((game.ggdeals_current_official, "Oficial (Actual)"))
-    elif not floor_candidates and game.steam_store_price and game.steam_store_price > 0.05 and not game.is_delisted_steam:
-        floor_candidates.append((game.steam_store_price, "Steam Store"))
-        
+    if game:
+        # Candidato 1: Keyshop actual (> 0.05€)
+        if game.ggdeals_keyshop_current and game.ggdeals_keyshop_current > 0.05:
+            floor_candidates.append((game.ggdeals_keyshop_current, "Keyshops (Actual)"))
+            
+        # Candidato 2: Mínimo histórico en Keyshops (> 0.05€)
+        if game.ggdeals_keyshop_hist_low and game.ggdeals_keyshop_hist_low > 0.05:
+            floor_candidates.append((game.ggdeals_keyshop_hist_low, "Mín. Histórico Keyshops"))
+            
+        # Candidato 3: Mínimo histórico en tiendas Oficiales (> 0.10€ para evitar juegos gratuitos)
+        if game.ggdeals_official_hist_low and game.ggdeals_official_hist_low > 0.10:
+            floor_candidates.append((game.ggdeals_official_hist_low, "Mín. Histórico Oficial"))
+            
+        # Candidato 4: Precio oficial actual (solo si no hay ningún precio de keyshop)
+        if not floor_candidates and game.ggdeals_official_current and game.ggdeals_official_current > 0.05:
+            floor_candidates.append((game.ggdeals_official_current, "Oficial (Actual)"))
+        elif not floor_candidates and game.steam_price and game.steam_price > 0.05 and not game.is_delisted:
+            floor_candidates.append((game.steam_price, "Steam Store"))
+            
     if floor_candidates:
         min_floor_price, min_floor_source = min(floor_candidates, key=lambda x: x[0])
-        game.floor_price_eur = round(min_floor_price, 2)
-        game.floor_price_source = min_floor_source
+        floor_price_eur = round(min_floor_price, 2)
+        floor_price_source = min_floor_source
         
-        # 3. Cálculo de pérdida / ganancia para el vendedor
-        loss = round(game.floor_price_eur - game.offer_value_cash_eur, 2)
-        game.seller_loss_eur = loss
+        # 3. Margen de arbitraje / Pérdida del vendedor
+        loss = round(floor_price_eur - offer_value_cash_eur, 2)
+        seller_loss_eur = loss
         
-        if game.floor_price_eur > 0:
-            loss_pct = round((loss / game.floor_price_eur) * 100, 1)
-            game.seller_loss_percent = loss_pct
+        if floor_price_eur > 0:
+            seller_loss_percent = round((loss / floor_price_eur) * 100, 1)
         else:
-            game.seller_loss_percent = 0.0
+            seller_loss_percent = 0.0
             
-        game.reseller_profit_eur = loss
-        game.reseller_profit_percent = game.seller_loss_percent
+        reseller_profit_eur = loss
+        reseller_profit_percent = seller_loss_percent
         
-        if game.seller_loss_percent >= 50:
-            game.deal_rating = "Gran Pérdida (>50% bajo suelo)"
-        elif game.seller_loss_percent >= 25:
-            game.deal_rating = "Favorable al Comprador (25-50% bajo suelo)"
-        elif game.seller_loss_percent > 0:
-            game.deal_rating = "Cerca del Suelo (0-25%)"
+        if seller_loss_percent >= 50:
+            deal_rating = "Gran Pérdida (>50% bajo suelo)"
+        elif seller_loss_percent >= 25:
+            deal_rating = "Favorable al Comprador (25-50% bajo suelo)"
+        elif seller_loss_percent > 0:
+            deal_rating = "Cerca del Suelo (0-25%)"
         else:
-            game.deal_rating = "¡Oferta Superior al Suelo!"
+            deal_rating = "¡Oferta Superior al Suelo!"
     else:
-        game.floor_price_eur = None
-        game.floor_price_source = "Pendiente"
-        game.seller_loss_eur = None
-        game.seller_loss_percent = None
-        game.reseller_profit_eur = None
-        game.reseller_profit_percent = None
-        game.deal_rating = "Normal"
+        floor_price_eur = None
+        floor_price_source = "Pendiente"
+        seller_loss_eur = None
+        seller_loss_percent = None
+        reseller_profit_eur = None
+        reseller_profit_percent = None
+        deal_rating = "Normal"
+        
+    return {
+        "offer_value_steam_eur": offer_value_steam_eur,
+        "offer_value_cash_eur": offer_value_cash_eur,
+        "floor_price_eur": floor_price_eur,
+        "floor_price_source": floor_price_source,
+        "seller_loss_eur": seller_loss_eur,
+        "seller_loss_percent": seller_loss_percent,
+        "reseller_profit_eur": reseller_profit_eur,
+        "reseller_profit_percent": reseller_profit_percent,
+        "deal_rating": deal_rating
+    }
 
 def scrape_ggdeals_game_data(game_name: str) -> Dict[str, Any]:
     """Scrapea la ficha de GG.deals para obtener precios actuales y mínimos históricos."""
@@ -139,36 +156,36 @@ def scrape_ggdeals_game_data(game_name: str) -> Dict[str, Any]:
         
     return result
 
-def sync_single_game(game: Game, settings: MarketSettingsModel):
-    """Sincroniza un juego consultando Steam Store API, SteamDB y GG.deals."""
-    # 1. Steam Store y Jugadores 24h
-    if game.steam_app_id:
-        details = fetch_steam_app_details(game.steam_app_id)
-        if details.get("is_delisted") or game.is_delisted_steam:
-            game.is_delisted_steam = True
-            if details.get("reason") and not game.delisted_reason:
-                game.delisted_reason = details.get("reason")
+def sync_single_game(game: Game, settings: Optional[MarketSettingsModel] = None):
+    """Sincroniza los metadatos de un juego consultando Steam Store API, SteamDB y GG.deals."""
+    app_id = game.app_id
+    if app_id:
+        details = fetch_steam_app_details(app_id)
+        if details.get("is_delisted"):
+            game.is_delisted = True
+            game.delisted_reason = details.get("reason") or "Retirado de la tienda de Steam"
+        else:
+            game.is_delisted = False
+            game.delisted_reason = None
         if details.get("price") is not None:
-            game.steam_store_price = details["price"]
+            game.steam_price = details["price"]
         if details.get("header_image"):
-            game.steam_header_image = details["header_image"]
-        game.steam_is_free = details.get("is_free", False)
+            game.header_image = details["header_image"]
         
-        players = fetch_steam_players_count(game.steam_app_id)
+        players = fetch_steam_players_count(app_id)
         if players is not None:
             game.steam_players_24h = players
             
-    # 2. GG.deals Scraping
+    # Scraping GG.deals
     gg_data = scrape_ggdeals_game_data(game.name)
-    if gg_data.get("current_official"):
-        game.ggdeals_current_official = gg_data["current_official"]
-    if gg_data.get("current_keyshop"):
-        game.ggdeals_current_keyshop = gg_data["current_keyshop"]
-        game.best_keyshop_price_eur = gg_data["current_keyshop"]
-    if gg_data.get("hist_official_low"):
-        game.ggdeals_historical_official_low = gg_data["hist_official_low"]
-    if gg_data.get("hist_keyshop_low"):
-        game.ggdeals_historical_keyshop_low = gg_data["hist_keyshop_low"]
+    if gg_data.get("current_official") is not None:
+        game.ggdeals_official_current = gg_data["current_official"]
+    if gg_data.get("current_keyshop") is not None:
+        game.ggdeals_keyshop_current = gg_data["current_keyshop"]
+    if gg_data.get("hist_official_low") is not None:
+        game.ggdeals_official_hist_low = gg_data["hist_official_low"]
+    if gg_data.get("hist_keyshop_low") is not None:
+        game.ggdeals_keyshop_hist_low = gg_data["hist_keyshop_low"]
         
-    # 3. Recalcular valoración y arbitraje
-    recalculate_game_offer(game, settings)
+    game.last_synced_at = datetime.utcnow()
+

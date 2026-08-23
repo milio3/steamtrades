@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, Boolean
+from sqlalchemy import Column, Integer, Float, Boolean, String
 from backend.app.db.session import Base
 
 class MarketSettingsModel(Base):
@@ -9,3 +9,4 @@ class MarketSettingsModel(Base):
     tf2_key_cash_price = Column(Float, default=1.62)
     steam_fee_percent = Column(Float, default=13.03)
     auto_refresh_tf2_key = Column(Boolean, default=True)
+    last_tf2_update = Column(String, nullable=True)

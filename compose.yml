@@ -10,7 +10,7 @@ services:
     volumes:
       - ${DATA_PATH:-/mnt/dietpi_userdata/apps/steamtrades/data}:/app/data
     environment:
-      - DATABASE_URL=sqlite:////app/data/steamkeys.db
+      - DATABASE_URL=sqlite:////app/data/steamtrades.db
       - DEFAULT_TF2_STEAM_PRICE=${DEFAULT_TF2_STEAM_PRICE:-2.02}
       - DEFAULT_TF2_CASH_PRICE=${DEFAULT_TF2_CASH_PRICE:-1.62}
       - DEFAULT_STEAM_FEE_PERCENT=${DEFAULT_STEAM_FEE_PERCENT:-13.03}

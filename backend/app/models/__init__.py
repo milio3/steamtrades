@@ -1,4 +1,5 @@
 from backend.app.models.game import Game
+from backend.app.models.offer import Offer
 from backend.app.models.settings import MarketSettingsModel
 
-__all__ = ["Game", "MarketSettingsModel"]
+__all__ = ["Game", "Offer", "MarketSettingsModel"]

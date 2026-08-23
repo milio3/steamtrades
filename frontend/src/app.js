@@ -1,7 +1,9 @@
 // Estado global de la aplicación
 let gamesData = [];
 let summaryData = {};
-let currentFilter = 'all'; // 'all', 'delisted', 'huge-margin', 'sold'
+let tf2CashPrice = 1.62;
+let tf2SteamPrice = 2.02;
+let currentFilter = 'listed'; // 'listed' (por defecto), 'delisted', 'pending', 'sold', 'issue'
 let currentSearch = '';
 let currentSort = 'loss_desc';
 let selectedGameId = null;
@@ -14,21 +16,26 @@ const sortSelect = document.getElementById('sort-select');
 // Badges y Estadísticas
 const tf2LiveBadge = document.getElementById('tf2-live-badge');
 const tf2CashBadge = document.getElementById('tf2-cash-badge');
+const tf2LastUpdate = document.getElementById('tf2-last-update');
 
 const statTotalGames = document.getElementById('stat-total-games');
 const statTotalKeys = document.getElementById('stat-total-keys');
-const statSteamValue = document.getElementById('stat-steam-value');
 const statCashValue = document.getElementById('stat-cash-value');
-const statMarketValue = document.getElementById('stat-market-value');
-const statResellerProfit = document.getElementById('stat-reseller-profit');
+const statRealizedSales = document.getElementById('stat-realized-sales');
+const statPotentialProfit = document.getElementById('stat-potential-profit');
+
 const countDelisted = document.getElementById('count-delisted');
 const countSold = document.getElementById('count-sold');
+const countListed = document.getElementById('count-listed');
+const countPending = document.getElementById('count-pending');
+const countIssue = document.getElementById('count-issue');
 
 // Botones de filtro
-const filterAll = document.getElementById('filter-all');
-const filterDelisted = document.getElementById('filter-delisted');
-const filterHugeMargin = document.getElementById('filter-huge-margin');
+const filterListed = document.getElementById('filter-listed');
+const filterPending = document.getElementById('filter-pending');
 const filterSold = document.getElementById('filter-sold');
+const filterDelisted = document.getElementById('filter-delisted');
+const filterIssue = document.getElementById('filter-issue');
 
 // Sincronización
 const btnSyncSteam = document.getElementById('btn-sync-steam');
@@ -48,17 +55,27 @@ const editKeyshopPrice = document.getElementById('edit-keyshop-price');
 const editOfficialPrice = document.getElementById('edit-official-price');
 const editHistKeyshop = document.getElementById('edit-hist-keyshop');
 const editHistOfficial = document.getElementById('edit-hist-official');
-const editLotName = document.getElementById('edit-lot-name');
-const editIsSold = document.getElementById('edit-is-sold');
+const editBuyerName = document.getElementById('edit-buyer-name');
+
+// Selector de Estado, Incidencia y Venta
+const editStatus = document.getElementById('edit-status');
+const modalStatusBadge = document.getElementById('modal-status-badge');
+const issueDetailsBox = document.getElementById('issue-details-box');
+const editIssueNote = document.getElementById('edit-issue-note');
+const soldDetailsBox = document.getElementById('sold-details-box');
 const editSoldCurrency = document.getElementById('edit-sold-currency');
 const editSoldPrice = document.getElementById('edit-sold-price');
 const editSoldCurrencyLabel = document.getElementById('edit-sold-currency-label');
 const editSoldNote = document.getElementById('edit-sold-note');
-const soldKeysContainer = document.getElementById('sold-keys-container');
-const soldBadge = document.getElementById('sold-badge');
+
+// Enlaces de Keyshops en el modal
+const modalKeyshopLinks = document.getElementById('modal-keyshop-links');
+const modalBestDealText = document.getElementById('modal-best-deal-text');
+
 const editForm = document.getElementById('edit-form');
 const btnCloseModal = document.getElementById('btn-close-modal');
 const btnCancelModal = document.getElementById('btn-cancel-modal');
+const btnDeleteGame = document.getElementById('btn-delete-game');
 
 // Modal Añadir Juego
 const btnOpenAddModal = document.getElementById('btn-open-add-modal');
@@ -68,13 +85,26 @@ const btnCancelAdd = document.getElementById('btn-cancel-add');
 const btnSubmitAdd = document.getElementById('btn-submit-add');
 const inputSteamUrl = document.getElementById('input-steam-url');
 const inputTf2Keys = document.getElementById('input-tf2-keys');
-const inputLotName = document.getElementById('input-lot-name');
+const inputBuyerName = document.getElementById('input-buyer-name');
 
 const FALLBACK_GAME_SVG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDY0IDMyIiBmaWxsPSIjMWUyOTNiIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iMzIiIHJ4PSI0Ii8+PHBhdGggZD0iTTI0IDEwaC0ydjRoLTR2Mmg0djRoMnYtNGg0di0yaC00di00em0xNCAyYTEuNSAxLjUgMCAxIDEtMyAwIDEuNSAxLjUgMCAwIDEgMyAwem00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bS00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bTQtOGExLjUgMS41IDAgMSAxLTMgMCAxLjUgMS41IDAgMCAxIDMgMHoiIGZpbGw9IiM2NDc0OGIiLz48L3N2Zz4=";
 
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Formateador inteligente de jugadores en 24h:
+// - Hasta 1.000: número exacto (ej. 742)
+// - 1.000 a 9.999: 1,25K (2 decimales con coma)
+// - 10.000 a 99.999: 10,1K (1 decimal con coma)
+// - A partir de 100.000: 100K (entero)
+function formatPlayersCount(num) {
+  if (typeof num !== 'number' || isNaN(num) || num <= 0) return '--';
+  if (num < 1000) return num.toString();
+  if (num < 10000) return (num / 1000).toFixed(2).replace('.', ',') + 'K';
+  if (num < 100000) return (num / 1000).toFixed(1).replace('.', ',') + 'K';
+  return Math.round(num / 1000) + 'K';
 }
 
 // Inicialización
@@ -89,29 +119,35 @@ function setupEventListeners() {
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       currentSearch = e.target.value;
-      loadGames();
+      renderGamesGrid();
     });
   }
 
   if (sortSelect) {
     sortSelect.addEventListener('change', (e) => {
       currentSort = e.target.value;
-      loadGames();
+      renderGamesGrid();
     });
   }
 
-  if (filterAll) filterAll.addEventListener('click', () => setFilter('all'));
-  if (filterDelisted) filterDelisted.addEventListener('click', () => setFilter('delisted'));
-  if (filterHugeMargin) filterHugeMargin.addEventListener('click', () => setFilter('huge-margin'));
+  if (filterListed) filterListed.addEventListener('click', () => setFilter('listed'));
+  if (filterPending) filterPending.addEventListener('click', () => setFilter('pending'));
   if (filterSold) filterSold.addEventListener('click', () => setFilter('sold'));
+  if (filterDelisted) filterDelisted.addEventListener('click', () => setFilter('delisted'));
+  if (filterIssue) filterIssue.addEventListener('click', () => setFilter('issue'));
 
   if (btnSyncSteam) {
     btnSyncSteam.addEventListener('click', async () => {
       btnSyncSteam.disabled = true;
-      btnSyncSteam.classList.add('opacity-50');
+      btnSyncSteam.classList.add('hidden');
+      if (syncProgressBar) {
+        syncProgressBar.classList.remove('hidden');
+        syncProgressBar.classList.add('flex');
+        if (syncProgressMsg) syncProgressMsg.textContent = 'Iniciando sincronización...';
+        if (syncProgressFill) syncProgressFill.style.width = '5%';
+      }
       try {
         await fetch('/api/sync-steam', { method: 'POST' });
-        if (syncProgressBar) syncProgressBar.classList.remove('hidden');
       } catch (err) {
         console.error("Error launching sync", err);
       }
@@ -127,6 +163,41 @@ function setupEventListeners() {
     });
   }
 
+  if (btnDeleteGame) {
+    btnDeleteGame.addEventListener('click', async () => {
+      if (!selectedGameId) return;
+      const curGame = gamesData.find(g => String(g.id) === String(selectedGameId));
+      const gameName = curGame ? curGame.name : `ID ${selectedGameId}`;
+      if (confirm(`¿Estás seguro de que deseas eliminar permanentemente "${gameName}" de la base de datos?`)) {
+        btnDeleteGame.disabled = true;
+        btnDeleteGame.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Eliminando...`;
+        try {
+          const res = await fetch(`/api/games/${selectedGameId}`, { method: 'DELETE' });
+          if (res.ok) {
+            closeModal();
+            await loadSummary();
+            await loadGames();
+          } else {
+            alert("Error al eliminar el juego.");
+          }
+        } catch (err) {
+          console.error("Error deleting game", err);
+          alert("Error de conexión al eliminar.");
+        } finally {
+          btnDeleteGame.disabled = false;
+          btnDeleteGame.innerHTML = `<i class="fa-solid fa-trash-can"></i> Eliminar`;
+        }
+      }
+    });
+  }
+
+  // Cambio de estado en el modal
+  if (editStatus) {
+    editStatus.addEventListener('change', (e) => {
+      updateModalStatusUI(e.target.value);
+    });
+  }
+
   if (editSoldCurrency) {
     editSoldCurrency.addEventListener('change', () => {
       const isEur = editSoldCurrency.value === 'EUR';
@@ -138,91 +209,123 @@ function setupEventListeners() {
     });
   }
 
-  if (editIsSold) {
-    editIsSold.addEventListener('change', () => {
-      if (soldKeysContainer) {
-        if (editIsSold.checked) {
-          soldKeysContainer.classList.remove('hidden');
-          soldKeysContainer.classList.add('flex');
-          if (soldBadge) soldBadge.classList.remove('hidden');
-          if (editSoldPrice && !editSoldPrice.value) {
-            const curGame = gamesData.find(g => g.id === selectedGameId);
-            if (curGame) editSoldPrice.value = curGame.tf2_keys_offered;
-          }
-        } else {
-          soldKeysContainer.classList.add('hidden');
-          soldKeysContainer.classList.remove('flex');
-          if (soldBadge) soldBadge.classList.add('hidden');
+  // Modal Añadir Juego
+  if (btnOpenAddModal) {
+    btnOpenAddModal.addEventListener('click', () => {
+      if (modalAddGame) {
+        modalAddGame.classList.remove('hidden');
+        modalAddGame.classList.add('flex');
+        if (inputSteamUrl) {
+          inputSteamUrl.value = '';
+          inputSteamUrl.focus();
+        }
+        if (inputTf2Keys) inputTf2Keys.value = '1.0';
+        if (inputBuyerName) {
+          inputBuyerName.value = '';
+          inputBuyerName.placeholder = 'Comprador (opcional)';
         }
       }
     });
   }
 
-  // Modal Añadir Juego
-  if (btnOpenAddModal && modalAddGame) {
-    btnOpenAddModal.addEventListener('click', () => {
-      if (inputSteamUrl) inputSteamUrl.value = '';
-      if (inputTf2Keys) inputTf2Keys.value = '1.0';
-      if (inputLotName) inputLotName.value = '';
-      modalAddGame.classList.remove('hidden');
-      modalAddGame.classList.add('flex');
-    });
-
-    const closeAddModal = () => {
+  function closeAddModal() {
+    if (modalAddGame) {
       modalAddGame.classList.add('hidden');
       modalAddGame.classList.remove('flex');
-    };
+    }
+  }
 
-    if (btnCloseAddModal) btnCloseAddModal.addEventListener('click', closeAddModal);
-    if (btnCancelAdd) btnCancelAdd.addEventListener('click', closeAddModal);
+  if (btnCloseAddModal) btnCloseAddModal.addEventListener('click', closeAddModal);
+  if (btnCancelAdd) btnCancelAdd.addEventListener('click', closeAddModal);
 
-    if (btnSubmitAdd) {
-      btnSubmitAdd.addEventListener('click', async () => {
-        const url = inputSteamUrl ? inputSteamUrl.value.trim() : '';
-        const keys = inputTf2Keys ? parseFloat(inputTf2Keys.value) : 1.0;
-        const lot = inputLotName ? (inputLotName.value.trim() || 'xMjalino') : 'xMjalino';
-        if (!url) return;
+  if (btnSubmitAdd) {
+    btnSubmitAdd.addEventListener('click', async () => {
+      const url = inputSteamUrl ? inputSteamUrl.value.trim() : '';
+      const keys = inputTf2Keys && inputTf2Keys.value ? parseFloat(inputTf2Keys.value) : 1.0;
+      const buyer = inputBuyerName && inputBuyerName.value.trim() ? inputBuyerName.value.trim() : null;
+      if (!url) return;
 
-        btnSubmitAdd.disabled = true;
-        btnSubmitAdd.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo...`;
-        try {
-          const res = await fetch('/api/games/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ steam_url: url, tf2_keys_offered: keys, lot_name: lot })
-          });
-          if (res.ok) {
-            closeAddModal();
-            await loadSummary();
-            await loadGames();
-          }
-        } catch (e) {
-          console.error(e);
-        } finally {
-          btnSubmitAdd.disabled = false;
-          btnSubmitAdd.innerHTML = `<i class="fa-solid fa-plus"></i> Añadir y Calcular`;
+      btnSubmitAdd.disabled = true;
+      btnSubmitAdd.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo...`;
+      try {
+        const res = await fetch('/api/games/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ steam_url: url, tf2_keys_offered: keys, offer_price: keys, buyer_name: buyer })
+        });
+        if (res.ok) {
+          closeAddModal();
+          await loadSummary();
+          await loadGames();
+        } else {
+          alert("Error al añadir el juego. Verifica la URL de Steam.");
         }
-      });
+      } catch (err) {
+        console.error("Error adding game", err);
+        alert("Error de conexión al añadir juego.");
+      } finally {
+        btnSubmitAdd.disabled = false;
+        btnSubmitAdd.innerHTML = `<i class="fa-solid fa-plus"></i> Añadir y Calcular`;
+      }
+    });
+  }
+}
+
+function updateModalStatusUI(statusVal) {
+  if (issueDetailsBox) {
+    if (statusVal === 'issue') {
+      issueDetailsBox.classList.remove('hidden');
+      if (editIssueNote && !editIssueNote.value) {
+        const curGame = gamesData.find(g => String(g.id) === String(selectedGameId));
+        if (curGame && curGame.issue_note) editIssueNote.value = curGame.issue_note;
+      }
+    } else {
+      issueDetailsBox.classList.add('hidden');
+    }
+  }
+
+  if (soldDetailsBox) {
+    if (statusVal === 'sold') {
+      soldDetailsBox.classList.remove('hidden');
+      if (editSoldPrice && !editSoldPrice.value) {
+        const curGame = gamesData.find(g => String(g.id) === String(selectedGameId));
+        if (curGame) editSoldPrice.value = curGame.tf2_keys_offered;
+      }
+    } else {
+      soldDetailsBox.classList.add('hidden');
+    }
+  }
+
+  if (modalStatusBadge) {
+    if (statusVal === 'listed') {
+      modalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-300 border border-slate-600';
+      modalStatusBadge.textContent = 'Listado';
+    } else if (statusVal === 'sold') {
+      modalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-950 text-emerald-300 border border-emerald-600';
+      modalStatusBadge.textContent = 'Vendido';
+    } else if (statusVal === 'issue') {
+      modalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-rose-950 text-rose-300 border border-rose-600';
+      modalStatusBadge.textContent = 'Incidencia';
+    } else {
+      modalStatusBadge.className = 'text-[10px] px-2 py-0.5 rounded font-bold bg-purple-950 text-purple-300 border border-purple-600';
+      modalStatusBadge.textContent = 'Tramitado';
     }
   }
 }
 
 function setFilter(filter) {
   currentFilter = filter;
-  [filterAll, filterDelisted, filterHugeMargin, filterSold].forEach(btn => {
+  [filterListed, filterDelisted, filterPending, filterSold, filterIssue].forEach(btn => {
     if (btn) btn.classList.remove('active');
   });
 
-  if (filter === 'all' && filterAll) {
-    filterAll.classList.add('active');
-  } else if (filter === 'delisted' && filterDelisted) {
-    filterDelisted.classList.add('active');
-  } else if (filter === 'huge-margin' && filterHugeMargin) {
-    filterHugeMargin.classList.add('active');
-  } else if (filter === 'sold' && filterSold) {
-    filterSold.classList.add('active');
-  }
-  loadGames();
+  if (filter === 'listed' && filterListed) filterListed.classList.add('active');
+  else if (filter === 'delisted' && filterDelisted) filterDelisted.classList.add('active');
+  else if (filter === 'pending' && filterPending) filterPending.classList.add('active');
+  else if (filter === 'sold' && filterSold) filterSold.classList.add('active');
+  else if (filter === 'issue' && filterIssue) filterIssue.classList.add('active');
+
+  renderGamesGrid();
 }
 
 async function loadSummary() {
@@ -230,25 +333,57 @@ async function loadSummary() {
     const res = await fetch('/api/summary');
     summaryData = await res.json();
 
-    if (tf2LiveBadge && typeof summaryData.tf2_steam_price === 'number') tf2LiveBadge.textContent = `${summaryData.tf2_steam_price.toFixed(2)} €`;
-    if (tf2CashBadge && typeof summaryData.tf2_cash_price === 'number') tf2CashBadge.textContent = `${summaryData.tf2_cash_price.toFixed(2)} €`;
+    if (typeof summaryData.tf2_steam_price === 'number') {
+      tf2SteamPrice = summaryData.tf2_steam_price;
+      if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+    }
+    if (typeof summaryData.tf2_cash_price === 'number') {
+      tf2CashPrice = summaryData.tf2_cash_price;
+      if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
+    }
 
+    if (tf2LastUpdate) {
+      if (summaryData.last_tf2_update) {
+        tf2LastUpdate.textContent = `(${summaryData.last_tf2_update})`;
+        tf2LastUpdate.title = `Última cotización oficial: ${summaryData.last_tf2_update}`;
+      } else {
+        tf2LastUpdate.textContent = '';
+      }
+    }
+
+    // 1. Total Juegos
     if (statTotalGames) statTotalGames.textContent = summaryData.total_games || 0;
     
-    // El pill de "Todos" refleja los juegos disponibles (no vendidos)
-    const pill = document.getElementById('stat-total-games-pill');
-    if (pill) pill.textContent = summaryData.available_count !== undefined ? summaryData.available_count : (summaryData.total_games || 0);
+    // 2. Oferta Activa (TF2 Keys)
+    if (statTotalKeys) {
+      const activeKeys = summaryData.active_keys_tf2 !== undefined ? summaryData.active_keys_tf2 : summaryData.total_keys;
+      statTotalKeys.textContent = Number(activeKeys || 0).toFixed(2);
+    }
     
-    if (statTotalKeys) statTotalKeys.textContent = summaryData.total_keys || 0;
-    if (statSteamValue && typeof summaryData.total_offer_steam_eur === 'number') statSteamValue.textContent = `${summaryData.total_offer_steam_eur.toFixed(2)} €`;
-    if (statCashValue && typeof summaryData.total_offer_cash_eur === 'number') statCashValue.textContent = `${summaryData.total_offer_cash_eur.toFixed(2)} €`;
-    if (statMarketValue && typeof summaryData.total_market_value_eur === 'number') statMarketValue.textContent = `${summaryData.total_market_value_eur.toFixed(2)} €`;
-    if (statResellerProfit && typeof summaryData.total_reseller_profit_eur === 'number') statResellerProfit.textContent = `+${summaryData.total_reseller_profit_eur.toFixed(2)} €`;
+    // 3. Oferta Activa en Dinero Real (€ Cash)
+    if (statCashValue) {
+      const activeCash = summaryData.active_offer_cash_eur !== undefined ? summaryData.active_offer_cash_eur : summaryData.total_offer_cash_eur;
+      statCashValue.textContent = `${Number(activeCash || 0).toFixed(2)} €`;
+    }
     
+    // 4. Saldo Realizado de Ventas (€)
+    if (statRealizedSales) {
+      const realized = summaryData.realized_sales_eur !== undefined ? summaryData.realized_sales_eur : 0.0;
+      statRealizedSales.textContent = `${Number(realized || 0).toFixed(2)} €`;
+    }
+    
+    // 5. Beneficio Potencial Activo (€)
+    if (statPotentialProfit) {
+      const potProfit = summaryData.potential_profit_eur !== undefined ? summaryData.potential_profit_eur : (summaryData.total_reseller_profit_eur || 0.0);
+      statPotentialProfit.textContent = `+${Number(potProfit || 0).toFixed(2)} €`;
+    }
+    
+    // Conteo por etiquetas
     if (countDelisted) countDelisted.textContent = summaryData.delisted_count || 0;
-    
-    const countSoldEl = document.getElementById('count-sold');
-    if (countSoldEl) countSoldEl.textContent = summaryData.sold_count || 0;
+    if (countSold) countSold.textContent = summaryData.sold_count || 0;
+    if (countListed) countListed.textContent = summaryData.listed_count || 0;
+    if (countPending) countPending.textContent = summaryData.pending_count || 0;
+    if (countIssue) countIssue.textContent = summaryData.issue_count || 0;
   } catch (err) {
     console.error("Error loading summary", err);
   }
@@ -264,6 +399,13 @@ async function loadGames() {
   }
 }
 
+function getGameEffectiveStatus(g) {
+  if (g.status === 'issue') return 'issue';
+  if (g.is_sold || g.status === 'sold') return 'sold';
+  if (g.status === 'listed') return 'listed';
+  return 'pending';
+}
+
 function renderGamesGrid() {
   if (!gamesGrid) return;
   gamesGrid.innerHTML = '';
@@ -276,22 +418,20 @@ function renderGamesGrid() {
     filtered = filtered.filter(g => g.name.toLowerCase().includes(term));
   }
 
-  // 2. Filtros rápidos (Los vendidos quedan excluidos de Todos, Deslistados y Mayor Pérdida)
+  // 2. Filtros de Estado y Categoría
   if (currentFilter === 'all') {
-    filtered = filtered.filter(g => !g.is_sold);
-  } else if (currentFilter === 'delisted') {
-    filtered = filtered.filter(g => g.is_delisted_steam && !g.is_sold);
-  } else if (currentFilter === 'huge-margin') {
-    filtered = filtered.filter(g => {
-      if (g.is_sold) return false;
-      const loss = typeof g.seller_loss_eur === 'number' ? g.seller_loss_eur : 0;
-      const floor = typeof g.floor_price_eur === 'number' ? g.floor_price_eur : 0;
-      if (floor <= 0) return false;
-      const pct = (loss / floor) * 100;
-      return pct >= 40.0;
-    });
+    // "Todos" muestra el catálogo activo de negociación (excluye Vendidos e Incidencias)
+    filtered = filtered.filter(g => !['sold', 'issue'].includes(getGameEffectiveStatus(g)));
+  } else if (currentFilter === 'listed') {
+    filtered = filtered.filter(g => getGameEffectiveStatus(g) === 'listed');
+  } else if (currentFilter === 'pending') {
+    filtered = filtered.filter(g => getGameEffectiveStatus(g) === 'pending');
   } else if (currentFilter === 'sold') {
-    filtered = filtered.filter(g => !!g.is_sold);
+    filtered = filtered.filter(g => getGameEffectiveStatus(g) === 'sold');
+  } else if (currentFilter === 'issue') {
+    filtered = filtered.filter(g => getGameEffectiveStatus(g) === 'issue');
+  } else if (currentFilter === 'delisted') {
+    filtered = filtered.filter(g => g.is_delisted_steam && !['sold', 'issue'].includes(getGameEffectiveStatus(g)));
   }
 
   // 3. Ordenación
@@ -331,6 +471,10 @@ function renderGamesGrid() {
   filtered.forEach(game => {
     const card = document.createElement('div');
     card.className = "game-card bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between hover:border-slate-700 transition";
+
+    const effStatus = getGameEffectiveStatus(game);
+    const isSold = effStatus === 'sold';
+    const isIssue = effStatus === 'issue';
 
     const lossEur = (typeof game.seller_loss_eur === 'number') ? game.seller_loss_eur : null;
     const floorPrice = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : null;
@@ -379,15 +523,37 @@ function renderGamesGrid() {
       `;
     }
 
-    const delistedBadge = game.is_delisted_steam ? `
-      <span class="bg-rose-900/90 backdrop-blur border border-rose-600/80 text-rose-200 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-md" title="${game.delisted_reason || 'Juego retirado de la tienda oficial de Steam'}">
-        <i class="fa-solid fa-triangle-exclamation text-rose-300 text-[8px]"></i> DELISTED
-      </span>
-    ` : '';
+    // Etiquetas abajo a la izquierda: 1º Estado (Listado / Tramitado / Vendido / Incidencia), 2º Coleccionista
+    let statusBadgeHtml = '';
+    if (effStatus === 'listed') {
+      statusBadgeHtml = `
+        <span class="bg-slate-800/90 border border-slate-600 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Publicado en SteamTrades sin oferta">
+          <i class="fa-solid fa-tag text-[8px] text-slate-400"></i> Listado
+        </span>
+      `;
+    } else if (effStatus === 'pending') {
+      statusBadgeHtml = `
+        <span class="bg-purple-950/90 border border-purple-600/80 text-purple-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Oferta recibida / En revisión / Esperando respuesta">
+          <i class="fa-solid fa-clock text-[8px] text-purple-400"></i> Tramitado
+        </span>
+      `;
+    } else if (effStatus === 'sold') {
+      statusBadgeHtml = `
+        <span class="bg-emerald-950/90 border border-emerald-600/80 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Trato cerrado y cobrado">
+          <i class="fa-solid fa-check text-[8px] text-emerald-400"></i> Vendido
+        </span>
+      `;
+    } else if (effStatus === 'issue') {
+      statusBadgeHtml = `
+        <span class="bg-rose-950/90 border border-rose-600/80 text-rose-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Incidencia registrada: ${escapeHtml(game.issue_note || '')}">
+          <i class="fa-solid fa-circle-exclamation text-[8px] text-rose-400"></i> Incidencia
+        </span>
+      `;
+    }
 
-    const soldBadgeCard = game.is_sold ? `
-      <span class="bg-emerald-950/95 backdrop-blur border border-emerald-600 text-emerald-300 text-[9px] font-black px-2 py-0.5 rounded flex items-center gap-1 shadow-md" title="Juego vendido">
-        <i class="fa-solid fa-check text-emerald-400 text-[8px]"></i> VENDIDO
+    const delistedBadge = game.is_delisted_steam ? `
+      <span class="bg-amber-950/80 border border-amber-600/70 text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="${game.delisted_reason || 'Juego retirado de la tienda oficial de Steam (Artículo de Coleccionista)'}">
+        <i class="fa-solid fa-crown text-amber-400 text-[8px]"></i> Coleccionista
       </span>
     ` : '';
 
@@ -396,7 +562,7 @@ function renderGamesGrid() {
 
     // Precios Actuales
     const curOfficialNum = (typeof game.ggdeals_current_official === 'number') ? game.ggdeals_current_official : ((typeof game.steam_store_price === 'number') ? game.steam_store_price : null);
-    const curOfficialStr = curOfficialNum !== null ? `${curOfficialNum.toFixed(2)}€` : (game.is_delisted_steam ? '<span class="text-rose-400 font-semibold font-sans text-[9px]">Delisted</span>' : '<span class="text-slate-600">N/D</span>');
+    const curOfficialStr = curOfficialNum !== null ? `${curOfficialNum.toFixed(2)}€` : (game.is_delisted_steam ? '<span class="text-amber-400 font-semibold font-sans text-[9px]">Coleccionista</span>' : '<span class="text-slate-600">N/D</span>');
 
     const curKeyshopNum = (typeof game.ggdeals_current_keyshop === 'number') ? game.ggdeals_current_keyshop : ((typeof game.best_keyshop_price_eur === 'number') ? game.best_keyshop_price_eur : null);
     const curKeyshopStr = curKeyshopNum !== null ? `${curKeyshopNum.toFixed(2)}€` : '<span class="text-slate-600">N/D</span>';
@@ -427,10 +593,26 @@ function renderGamesGrid() {
     const offerSteamEur = (typeof game.offer_value_steam_eur === 'number') ? game.offer_value_steam_eur : 0;
     const offerCashEur = (typeof game.offer_value_cash_eur === 'number') ? game.offer_value_cash_eur : 0;
 
-    // Sección Central: Panel Unificado de Venta vs Tabla de Precios
+    // Sección Central: Incidencia vs Panel de Venta vs Tabla de Precios
     let centralContentHtml = '';
 
-    if (game.is_sold) {
+    if (isIssue) {
+      const issueDesc = game.issue_note ? escapeHtml(game.issue_note) : 'Incidencia registrada sin motivo especificado.';
+      centralContentHtml = `
+        <!-- Panel de Incidencia Registrada -->
+        <div class="bg-rose-950/30 border border-rose-800/70 rounded-xl p-2.5 flex-1 flex flex-col justify-center space-y-1.5 shadow-sm">
+          <div class="flex items-center justify-between border-b border-rose-900/60 pb-1">
+            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-exclamation text-rose-400 text-xs"></i> Incidencia / Problema
+            </span>
+            <span class="text-[9px] bg-rose-950 text-rose-300 border border-rose-700/80 px-1.5 py-0.5 rounded font-bold font-mono">Bloqueada</span>
+          </div>
+          <p class="text-[11px] text-rose-200/90 font-medium line-clamp-3 italic pt-0.5" title="${issueDesc}">
+            "${issueDesc}"
+          </p>
+        </div>
+      `;
+    } else if (isSold) {
       const isSoldEur = game.sold_currency === 'EUR';
       const priceVal = game.sold_price !== null && game.sold_price !== undefined ? Number(game.sold_price) : Number(game.sold_tf2_keys || game.tf2_keys_offered);
       const noteText = game.sold_note ? escapeHtml(game.sold_note) : '';
@@ -452,16 +634,25 @@ function renderGamesGrid() {
         conversionDisplay = `~${soldEur.toFixed(2)}€ Cash | ~${soldSteamEur.toFixed(2)}€ Steam`;
       }
 
-      const floorPrice = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : 0;
-      const profitEur = soldEur - floorPrice;
-      const profitPct = floorPrice > 0 ? ((profitEur / floorPrice) * 100) : 0;
+      // 1. Comparativa vs Suelo de Mercado
+      const floorP = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : 0;
+      const profitEur = soldEur - floorP;
+      const profitPct = floorP > 0 ? ((profitEur / floorP) * 100) : 0;
       const isFavorable = profitEur >= 0;
 
+      // 2. Comparativa vs Oferta Inicial Recibida
+      const origKeys = Number(game.tf2_keys_offered) || 0;
+      const origOfferCashEur = origKeys * tf2CashPrice;
+      const profitVsOfferEur = soldEur - origOfferCashEur;
+      const profitVsOfferPct = origOfferCashEur > 0 ? ((profitVsOfferEur / origOfferCashEur) * 100) : 0;
+      const improvedOffer = profitVsOfferEur > 0.01;
+      const sameOffer = Math.abs(profitVsOfferEur) <= 0.01;
+
       centralContentHtml = `
-        <!-- Panel Unificado de Venta & Rentabilidad -->
-        <div class="bg-slate-950/90 border ${isFavorable ? 'border-emerald-800/60' : 'border-rose-800/60'} rounded-xl p-3 flex-1 flex flex-col justify-between space-y-2.5 shadow-sm">
+        <!-- Panel Unificado de Venta & Rentabilidad Dual -->
+        <div class="bg-slate-950/90 border ${isFavorable ? 'border-emerald-800/60' : 'border-rose-800/60'} rounded-xl p-2.5 flex-1 flex flex-col justify-between space-y-2 shadow-sm">
           <!-- Cabecera de Venta -->
-          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <div>
               <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Precio de Venta</span>
               <div class="flex items-center gap-1.5 mt-0.5">
@@ -475,24 +666,43 @@ function renderGamesGrid() {
             </div>
           </div>
 
-          <!-- Resultado sobre Suelo & % Profit -->
-          <div class="${isFavorable ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border border-rose-800/50 text-rose-300'} p-2 rounded-lg flex items-center justify-between">
-            <div>
-              <div class="flex items-center gap-1.5 font-bold text-[11px]">
-                <i class="fa-solid ${isFavorable ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400'}"></i>
-                <span>${isFavorable ? 'Trato Favorable' : 'Trato Desfavorable'}</span>
-              </div>
-              <div class="text-[9px] text-slate-400 font-mono mt-0.5">
-                Suelo: ${floorPrice.toFixed(2)}€
+          <!-- Métricas de Rentabilidad: vs Oferta y vs Suelo -->
+          <div class="space-y-1.5">
+            <!-- vs Oferta Inicial Recibida -->
+            <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-2 py-1 flex items-center justify-between text-xs">
+              <span class="text-slate-400 text-[10px] font-semibold flex items-center gap-1">
+                <i class="fa-solid fa-hand-holding-dollar text-amber-400 text-[9px]"></i> vs Oferta inicial (${origKeys} TF2):
+              </span>
+              <div class="text-right font-mono text-[10px] font-bold">
+                ${improvedOffer ? `
+                  <span class="text-emerald-400">+${profitVsOfferEur.toFixed(2)} € (+${profitVsOfferPct.toFixed(1)}%)</span>
+                ` : sameOffer ? `
+                  <span class="text-slate-300">0.00 € (Aceptada)</span>
+                ` : `
+                  <span class="text-rose-400">${profitVsOfferEur.toFixed(2)} € (${profitVsOfferPct.toFixed(1)}%)</span>
+                `}
               </div>
             </div>
-            <div class="text-right font-mono">
-              <span class="text-xs font-black ${isFavorable ? 'text-emerald-300' : 'text-rose-300'} block">
-                ${isFavorable ? '+' : ''}${profitEur.toFixed(2)} € sobre suelo
-              </span>
-              <span class="text-[10px] font-black ${isFavorable ? 'text-emerald-400' : 'text-rose-400'} block">
-                ${isFavorable ? '+' : ''}${profitPct.toFixed(1)}% Profit
-              </span>
+
+            <!-- vs Suelo de Mercado -->
+            <div class="${isFavorable ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border border-rose-800/50 text-rose-300'} px-2 py-1.5 rounded-lg flex items-center justify-between text-xs">
+              <div>
+                <div class="flex items-center gap-1 font-bold text-[10px]">
+                  <i class="fa-solid ${isFavorable ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400'} text-[9px]"></i>
+                  <span>${isFavorable ? 'Trato Favorable' : 'Trato Desfavorable'}</span>
+                </div>
+                <div class="text-[9px] text-slate-400 font-mono">
+                  Suelo: ${floorP.toFixed(2)}€
+                </div>
+              </div>
+              <div class="text-right font-mono">
+                <span class="text-[11px] font-black ${isFavorable ? 'text-emerald-300' : 'text-rose-300'} block">
+                  ${isFavorable ? '+' : ''}${profitEur.toFixed(2)} €
+                </span>
+                <span class="text-[9px] font-bold ${isFavorable ? 'text-emerald-400' : 'text-rose-400'} block">
+                  ${isFavorable ? '+' : ''}${profitPct.toFixed(1)}% sobre suelo
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -537,26 +747,24 @@ function renderGamesGrid() {
       `;
     }
 
+    const formattedPlayers = formatPlayersCount(game.steam_players_24h);
+
     card.innerHTML = `
-      <!-- Banner / Imagen Clickable para Editar con Halo Sutil -->
+      <!-- Banner / Imagen Clickable para Editar -->
       <div onclick="openEditModal('${game.id}')" title="Haz clic en la imagen para editar cotización y datos" 
            class="relative h-24 bg-slate-950 overflow-hidden group cursor-pointer border-b border-slate-800/80 transition duration-300 hover:ring-2 hover:ring-blue-500/30">
         <img src="${headerImage}" alt="${safeName}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.onerror=null; this.src='${FALLBACK_GAME_SVG}'">
         <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
         
-        <!-- Badges flotantes izquierda (Delisted / Sold) -->
-        <div class="absolute top-1.5 left-1.5 flex items-center gap-1 z-10">
-          ${delistedBadge}
-          ${soldBadgeCard}
-        </div>
-
-        <!-- Badge flotante derecha (Lote) -->
-        <div class="absolute top-1.5 right-1.5 z-10">
-          <span class="bg-slate-900/90 backdrop-blur border border-slate-700/80 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-md" title="Lote: ${game.lot_name || 'xMjalino'}">
-            <i class="fa-solid fa-layer-group text-slate-400 text-[8px]"></i>
-            <span>${escapeHtml(game.lot_name || 'xMjalino')}</span>
-          </span>
-        </div>
+        <!-- Badge flotante derecha (Comprador) -->
+        ${game.buyer_name ? `
+          <div class="absolute top-1.5 right-1.5 z-10">
+            <span class="bg-slate-900/90 backdrop-blur border border-slate-700/80 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-md" title="Comprador: ${escapeHtml(game.buyer_name)}">
+              <i class="fa-solid fa-user text-slate-400 text-[8px]"></i>
+              <span>${escapeHtml(game.buyer_name)}</span>
+            </span>
+          </div>
+        ` : ''}
 
         <div class="absolute bottom-1.5 left-2.5 right-2.5">
           <h2 class="text-xs font-bold text-white line-clamp-1 group-hover:text-blue-300 transition" title="${safeName}">
@@ -586,28 +794,41 @@ function renderGamesGrid() {
         <!-- Sección Central Dinámica (Vendido vs Precios) -->
         ${centralContentHtml}
 
-        <!-- Barra Inferior de Enlaces y Jugadores en 24h a la Izquierda -->
-        <div class="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px] text-slate-400">
-          <!-- Jugadores en las últimas 24h abajo a la izquierda -->
-          <span class="text-[10px] text-slate-400 font-mono font-medium flex items-center gap-1" title="Jugadores activos en Steam (últimas 24h)">
-            <i class="fa-solid fa-users text-slate-500 text-[9px]"></i>
-            <span>${typeof game.steam_players_24h === 'number' ? game.steam_players_24h.toLocaleString() : '--'}</span>
-          </span>
+        <!-- Barra Inferior: Tags abajo a la izquierda | Enlaces al medio | Jugadores a la derecha -->
+        <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-400 gap-2">
+          
+          <!-- Etiquetas abajo a la izquierda (1º Estado, 2º Delisted) -->
+          <div class="flex items-center gap-1 flex-shrink-0">
+            ${statusBadgeHtml}
+            ${delistedBadge}
+          </div>
 
-          <!-- Enlaces Rápidos de Verificación a la derecha -->
-          <div class="flex items-center space-x-2.5">
+          <!-- Enlaces Rápidos de Verificación (Steam, SteamDB, GG.deals) -->
+          <div class="flex items-center space-x-2.5 text-[10px]">
             ${game.steam_app_id ? `
-              <a href="https://store.steampowered.com/app/${game.steam_app_id}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-0.5" title="Ver en Steam Store">
-                <i class="fa-brands fa-steam text-xs"></i> Steam
+              <a href="https://store.steampowered.com/app/${game.steam_app_id}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-medium" title="Ver en Steam Store">
+                <i class="fa-brands fa-steam text-xs"></i>
+                <span>Steam</span>
               </a>
-              <a href="https://steamdb.info/app/${game.steam_app_id}/" target="_blank" class="hover:text-slate-200 transition flex items-center gap-0.5" title="Ver en SteamDB">
-                <i class="fa-solid fa-chart-simple text-[10px]"></i> SteamDB
+              <a href="https://steamdb.info/app/${game.steam_app_id}/" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-medium" title="Ver en SteamDB">
+                <i class="fa-solid fa-chart-simple text-[10px]"></i>
+                <span>SteamDB</span>
               </a>
             ` : ''}
-            <a href="https://gg.deals/games/?title=${encodeURIComponent(game.name)}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-0.5 font-bold" title="Ver en GG.deals">
-              <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i> GG.deals
+            <a href="https://gg.deals/games/?title=${encodeURIComponent(game.name)}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-bold" title="Ver en GG.deals">
+              <i class="fa-solid fa-tags text-[10px]"></i>
+              <span>GG.deals</span>
             </a>
           </div>
+
+          <!-- Jugadores en las últimas 24h a la DERECHA DEL TODO con formato inteligente (K) -->
+          <div class="flex items-center justify-end min-w-[58px] flex-shrink-0 text-right">
+            <span class="text-[10px] text-slate-400 font-mono font-medium flex items-center gap-1" title="Jugadores activos en Steam (últimas 24h): ${typeof game.steam_players_24h === 'number' ? game.steam_players_24h.toLocaleString() : 'N/D'}">
+              <i class="fa-solid fa-users text-slate-500 text-[9px]"></i>
+              <span>${formattedPlayers}</span>
+            </span>
+          </div>
+
         </div>
       </div>
     `;
@@ -618,7 +839,7 @@ function renderGamesGrid() {
 
 function openEditModal(gameId) {
   selectedGameId = gameId;
-  const game = gamesData.find(g => g.id === gameId);
+  const game = gamesData.find(g => String(g.id) === String(gameId));
   if (!game) return;
 
   if (modalTitle) modalTitle.textContent = game.name;
@@ -635,12 +856,16 @@ function openEditModal(gameId) {
   if (editOfficialPrice) editOfficialPrice.value = game.ggdeals_current_official || game.steam_store_price || '';
   if (editHistKeyshop) editHistKeyshop.value = game.ggdeals_historical_keyshop_low || '';
   if (editHistOfficial) editHistOfficial.value = game.ggdeals_historical_official_low || '';
-  if (editLotName) editLotName.value = game.lot_name || 'xMjalino';
+  if (editBuyerName) editBuyerName.value = game.buyer_name || '';
+  if (editIssueNote) editIssueNote.value = game.issue_note || '';
 
-  // Estado de vendido
-  const isSold = !!game.is_sold;
-  if (editIsSold) editIsSold.checked = isSold;
-  
+  // Estado del juego
+  const effStatus = getGameEffectiveStatus(game);
+  if (editStatus) editStatus.value = effStatus;
+  updateModalStatusUI(effStatus);
+
+  // Datos de venta
+  const isSold = effStatus === 'sold';
   const curCurrency = game.sold_currency || 'TF2';
   if (editSoldCurrency) editSoldCurrency.value = curCurrency;
   if (editSoldCurrencyLabel) editSoldCurrencyLabel.textContent = curCurrency === 'EUR' ? '€' : 'TF2';
@@ -650,16 +875,32 @@ function openEditModal(gameId) {
     editSoldPrice.value = initVal;
   }
   if (editSoldNote) editSoldNote.value = game.sold_note || '';
-  
-  if (soldKeysContainer) {
-    if (isSold) {
-      soldKeysContainer.classList.remove('hidden');
-      soldKeysContainer.classList.add('flex');
-      if (soldBadge) soldBadge.classList.remove('hidden');
+
+  // Enlaces a Plataformas de Keyshops
+  if (modalKeyshopLinks) {
+    const qName = encodeURIComponent(game.name);
+    const platforms = [
+      { name: "Eneba", url: `https://www.eneba.com/store/all?text=${qName}`, icon: "fa-tag", color: "text-amber-400 hover:text-amber-300" },
+      { name: "Kinguin", url: `https://www.kinguin.net/listing?active=1&hide_out_of_stock=1&phrase=${qName}`, icon: "fa-crown", color: "text-orange-400 hover:text-orange-300" },
+      { name: "G2A", url: `https://www.g2a.com/search?query=${qName}`, icon: "fa-gamepad", color: "text-blue-400 hover:text-blue-300" },
+      { name: "CDKeys", url: `https://www.cdkeys.com/?q=${qName}`, icon: "fa-key", color: "text-emerald-400 hover:text-emerald-300" },
+      { name: "Gamivo", url: `https://www.gamivo.com/search/${qName}`, icon: "fa-bag-shopping", color: "text-rose-400 hover:text-rose-300" },
+      { name: "Driffle", url: `https://driffle.com/search?keyword=${qName}`, icon: "fa-shield", color: "text-purple-400 hover:text-purple-300" }
+    ];
+
+    modalKeyshopLinks.innerHTML = platforms.map(p => `
+      <a href="${p.url}" target="_blank" class="bg-slate-900 hover:bg-slate-800 border border-slate-700/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition font-semibold ${p.color}">
+        <i class="fa-solid ${p.icon} text-[10px]"></i>
+        <span>${p.name}</span>
+      </a>
+    `).join('');
+  }
+
+  if (modalBestDealText) {
+    if (game.best_keyshop_name && typeof game.best_keyshop_price_eur === 'number') {
+      modalBestDealText.textContent = `Mejor: ${game.best_keyshop_name} (${game.best_keyshop_price_eur.toFixed(2)}€)`;
     } else {
-      soldKeysContainer.classList.add('hidden');
-      soldKeysContainer.classList.remove('flex');
-      if (soldBadge) soldBadge.classList.add('hidden');
+      modalBestDealText.textContent = '';
     }
   }
 
@@ -680,24 +921,30 @@ function closeModal() {
 async function saveModalData() {
   if (!selectedGameId) return;
 
-  const isSold = editIsSold ? editIsSold.checked : false;
+  const currentStatusVal = editStatus ? editStatus.value : 'pending';
+  const isSold = currentStatusVal === 'sold';
+  const isIssue = currentStatusVal === 'issue';
   const soldCurr = editSoldCurrency ? editSoldCurrency.value : 'TF2';
   const soldPriceVal = isSold && editSoldPrice && editSoldPrice.value ? parseFloat(editSoldPrice.value) : null;
   const soldNoteVal = isSold && editSoldNote && editSoldNote.value.trim() ? editSoldNote.value.trim() : null;
-  const lot = editLotName ? (editLotName.value.trim() || 'xMjalino') : 'xMjalino';
+  const issueNoteVal = isIssue && editIssueNote && editIssueNote.value.trim() ? editIssueNote.value.trim() : null;
+  const buyer = editBuyerName && editBuyerName.value.trim() ? editBuyerName.value.trim() : null;
 
   const payload = {
     tf2_keys_offered: parseFloat(editTf2Keys.value) || 0,
+    offer_price: parseFloat(editTf2Keys.value) || 0,
     best_keyshop_price_eur: editKeyshopPrice.value ? parseFloat(editKeyshopPrice.value) : null,
     ggdeals_current_official: editOfficialPrice.value ? parseFloat(editOfficialPrice.value) : null,
     ggdeals_historical_keyshop_low: editHistKeyshop.value ? parseFloat(editHistKeyshop.value) : null,
     ggdeals_historical_official_low: editHistOfficial.value ? parseFloat(editHistOfficial.value) : null,
+    status: currentStatusVal,
     is_sold: isSold,
     sold_currency: soldCurr,
     sold_price: soldPriceVal,
     sold_tf2_keys: soldCurr === 'TF2' ? soldPriceVal : null,
     sold_note: soldNoteVal,
-    lot_name: lot
+    issue_note: issueNoteVal,
+    buyer_name: buyer
   };
 
   try {
@@ -722,22 +969,55 @@ async function saveModalData() {
   }
 }
 
+async function deleteCurrentGame() {
+  if (!selectedGameId) return;
+  const curGame = gamesData.find(g => String(g.id) === String(selectedGameId));
+  const name = curGame ? curGame.name : 'este juego';
+
+  if (!confirm(`¿Estás seguro de que deseas eliminar "${name}" permanentemente?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/games/${selectedGameId}`, {
+      method: 'DELETE'
+    });
+
+    if (res.ok) {
+      closeModal();
+      await loadSummary();
+      await loadGames();
+    } else {
+      alert("Error al eliminar el juego");
+    }
+  } catch (err) {
+    console.error("Error deleting game", err);
+    alert("Error al conectar con el servidor.");
+  }
+}
+
 function checkSyncStatusLoop() {
   setInterval(async () => {
     try {
       const res = await fetch('/api/sync-status');
       const status = await res.json();
       if (status.is_syncing) {
-        if (syncProgressBar) syncProgressBar.classList.remove('hidden');
+        if (syncProgressBar) {
+          syncProgressBar.classList.remove('hidden');
+          syncProgressBar.classList.add('flex');
+        }
+        if (btnSyncSteam) btnSyncSteam.classList.add('hidden');
         if (syncProgressMsg) syncProgressMsg.textContent = status.message || 'Sincronizando...';
         if (syncProgressFill) {
           const pct = (status.current / Math.max(1, status.total)) * 100;
-          syncProgressFill.style.width = `${pct}%`;
+          syncProgressFill.style.width = `${Math.max(5, pct)}%`;
         }
       } else {
         if (syncProgressBar && !syncProgressBar.classList.contains('hidden')) {
           syncProgressBar.classList.add('hidden');
+          syncProgressBar.classList.remove('flex');
           if (btnSyncSteam) {
+            btnSyncSteam.classList.remove('hidden');
             btnSyncSteam.disabled = false;
             btnSyncSteam.classList.remove('opacity-50');
           }

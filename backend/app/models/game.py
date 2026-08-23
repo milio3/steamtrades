@@ -1,60 +1,84 @@
-from sqlalchemy import Column, String, Float, Integer, Boolean, Text
+from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from backend.app.db.session import Base
 
 class Game(Base):
     __tablename__ = "games"
 
-    id = Column(String, primary_key=True, index=True)
+    # Steam AppID único como clave primaria
+    app_id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
-    tf2_keys_offered = Column(Float, nullable=False, default=1.0)
-    steam_app_id = Column(Integer, nullable=True, index=True)
-    steam_header_image = Column(String, nullable=True)
-    is_delisted_steam = Column(Boolean, default=False)
+    header_image = Column(String, nullable=True)
+    is_delisted = Column(Boolean, default=False)
     delisted_reason = Column(String, nullable=True)
     
-    # Precios de Steam en vivo y jugadores
-    steam_store_price = Column(Float, nullable=True)
-    steam_is_free = Column(Boolean, default=False)
+    # Precios de Steam y jugadores activos
+    steam_price = Column(Float, nullable=True)
     steam_players_24h = Column(Integer, nullable=True)
     
-    # Valoración de la oferta recibida
-    offer_value_steam_eur = Column(Float, nullable=True)
-    offer_value_cash_eur = Column(Float, nullable=True)
-    
-    # Datos completos de GG.deals
-    ggdeals_current_official = Column(Float, nullable=True)
-    ggdeals_current_keyshop = Column(Float, nullable=True)
-    ggdeals_current_keyshop_discount = Column(String, nullable=True)
-    ggdeals_best_deal = Column(String, nullable=True)
-    ggdeals_historical_official_low = Column(Float, nullable=True)
-    ggdeals_historical_official_time = Column(String, nullable=True)
-    ggdeals_historical_keyshop_low = Column(Float, nullable=True)
-    ggdeals_historical_keyshop_time = Column(String, nullable=True)
-    
-    # Resumen de mercado
-    best_keyshop_price_eur = Column(Float, nullable=True)
+    # Precios y Mínimos de GG.deals
+    ggdeals_official_current = Column(Float, nullable=True)
+    ggdeals_keyshop_current = Column(Float, nullable=True)
+    ggdeals_keyshop_discount = Column(String, nullable=True)
+    ggdeals_official_hist_low = Column(Float, nullable=True)
+    ggdeals_official_hist_time = Column(String, nullable=True)
+    ggdeals_keyshop_hist_low = Column(Float, nullable=True)
+    ggdeals_keyshop_hist_time = Column(String, nullable=True)
     best_keyshop_name = Column(String, nullable=True)
-    best_official_price_eur = Column(Float, nullable=True)
-    best_official_shop = Column(String, nullable=True)
-    last_discount_date = Column(String, nullable=True)
-    
-    # Métricas de arbitraje y suelo
-    floor_price_eur = Column(Float, nullable=True)
-    floor_price_source = Column(String, nullable=True)
-    seller_loss_eur = Column(Float, nullable=True)
-    seller_loss_percent = Column(Float, nullable=True)
-    reseller_profit_eur = Column(Float, nullable=True)
-    reseller_profit_percent = Column(Float, nullable=True)
-    deal_rating = Column(String, default="Normal")
-    
-    # Negociación, revisión y ventas
-    is_reviewed = Column(Boolean, default=False)
-    counter_increase_tf2 = Column(Float, default=0.0)
-    is_sold = Column(Boolean, default=False)
-    sold_tf2_keys = Column(Float, nullable=True)
-    sold_currency = Column(String, default="TF2")  # 'TF2' o 'EUR'
-    sold_price = Column(Float, nullable=True)
-    sold_note = Column(String, nullable=True)  # Ej: 'Pago Paypal'
-    
-    # Lote asignado
-    lot_name = Column(String, default="xMjalino", index=True)
+    last_synced_at = Column(DateTime, nullable=True)
+
+    # Relación con sus ofertas / claves
+    offers = relationship("Offer", back_populates="game", cascade="all, delete-orphan")
+
+    # Alias / Propiedades para facilitar compatibilidad
+    @property
+    def id(self):
+        return self.app_id
+
+    @property
+    def steam_app_id(self):
+        return self.app_id
+
+    @property
+    def is_delisted_steam(self):
+        return bool(self.is_delisted)
+
+    @property
+    def steam_header_image(self):
+        return self.header_image
+
+    @property
+    def steam_store_price(self):
+        return self.steam_price
+
+    @property
+    def ggdeals_current_official(self):
+        return self.ggdeals_official_current
+
+    @property
+    def ggdeals_current_keyshop(self):
+        return self.ggdeals_keyshop_current
+
+    @property
+    def ggdeals_current_keyshop_discount(self):
+        return self.ggdeals_keyshop_discount
+
+    @property
+    def ggdeals_historical_official_low(self):
+        return self.ggdeals_official_hist_low
+
+    @property
+    def ggdeals_historical_official_time(self):
+        return self.ggdeals_official_hist_time
+
+    @property
+    def ggdeals_historical_keyshop_low(self):
+        return self.ggdeals_keyshop_hist_low
+
+    @property
+    def ggdeals_historical_keyshop_time(self):
+        return self.ggdeals_keyshop_hist_time
+
+    @property
+    def best_keyshop_price_eur(self):
+        return self.ggdeals_keyshop_current

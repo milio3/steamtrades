@@ -1,6 +1,6 @@
 # Steam Trades & Keys Valuation
 
-Aplicación personal para la **valoración, análisis de rentabilidad, arbitraje y generación inteligente de contraofertas** de lotes de claves de Steam recibidas en operaciones de intercambio (SteamTrades, Barter.vg, etc.) en **Mann Co. Supply Crate Keys (TF2 Keys)**.
+Aplicación personal para la **valoración, análisis de rentabilidad, arbitraje y generación inteligente de contraofertas** de ofertas individuales de claves de Steam recibidas en operaciones de intercambio (SteamTrades, Barter.vg, etc.) en **Mann Co. Supply Crate Keys (TF2 Keys)**.
 
 ---
 
@@ -11,8 +11,8 @@ Aplicación personal para la **valoración, análisis de rentabilidad, arbitraje
 * **Análisis de Suelo y Arbitraje:** Identifica el suelo mínimo de mercado y calcula las ganancias/pérdidas del vendedor frente al comprador.
 * **Doble Interfaz:**
   * **Vista de Tarjetas (`/`):** Comparador de precios de 4 columnas (*Tipo, Oficial, Keyshops, Dto.*), halo de edición y footer con métricas consolidadas.
-  * **Vista de Tabla (`/table`):** Generador reactivo de contraofertas, columna dedicada de *Lote*, ordenación en vivo por cabeceras y exportación CSV compatible con Excel.
-* **Persistencia Relacional SQLite:** Modelos ORM estructurados en SQLite vía SQLAlchemy con soporte de lotes (`xMjalino`, `Lote_Agosto`) y registro de juegos vendidos.
+  * **Vista de Tabla (`/table`):** Generador reactivo de contraofertas, columna dedicada de *Comprador*, ordenación en vivo por cabeceras y exportación/importación CSV compatible con Excel.
+* **Persistencia Relacional SQLite:** Modelos ORM estructurados en SQLite vía SQLAlchemy con soporte de múltiples compradores (`xMjalino`, etc.) y registro de juegos vendidos.
 
 ---
 
@@ -149,7 +149,7 @@ docker compose up -d
 
 ## 9. Datos Persistentes
 
-Siguiendo la convención obligatoria, todos los datos persistentes (base de datos SQLite `steamkeys.db`) se almacenan **fuera del filesystem efímero del contenedor**:
+Siguiendo la convención obligatoria, todos los datos persistentes (base de datos SQLite `steamtrades.db`) se almacenan **fuera del filesystem efímero del contenedor**:
 
 * **Ruta en Raspberry Pi:** `/mnt/dietpi_userdata/apps/steamtrades/data`
 * **Ruta montada dentro del contenedor:** `/app/data`
@@ -224,7 +224,7 @@ Para realizar una copia de seguridad consistente de la base de datos SQLite:
 
 ```bash
 # Copia en caliente del archivo SQLite hacia almacenamiento externo o backups
-cp /mnt/dietpi_userdata/apps/steamtrades/data/steamkeys.db /mnt/dietpi_userdata/backups/steamkeys_$(date +%Y%m%d_%H%M%S).db
+cp /mnt/dietpi_userdata/apps/steamtrades/data/steamtrades.db /mnt/dietpi_userdata/backups/steamtrades_$(date +%Y%m%d_%H%M%S).db
 ```
 
 > [!NOTE]
@@ -235,8 +235,8 @@ cp /mnt/dietpi_userdata/apps/steamtrades/data/steamkeys.db /mnt/dietpi_userdata/
 ## 14. Migraciones y Base de Datos
 
 La aplicación utiliza **SQLAlchemy** con inicialización automática:
-* Al arrancar, si `steamkeys.db` no existe, `init_database()` crea automáticamente las tablas y migra los 107 juegos desde `games_db.json`.
-* Los datos persistentes residen en `/mnt/dietpi_userdata/apps/steamtrades/data/steamkeys.db` y se conservan intactos entre reinicios y actualizaciones.
+* Al arrancar, si `steamtrades.db` no existe, `init_database()` crea automáticamente las tablas y migra los 107 juegos desde `games_db.json`.
+* Los datos persistentes residen en `/mnt/dietpi_userdata/apps/steamtrades/data/steamtrades.db` y se conservan intactos entre reinicios y actualizaciones.
 
 ---
 

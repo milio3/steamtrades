@@ -14,8 +14,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="Steam Trades & Keys Valuation API",
-    description="API para la valoración, arbitraje y contraoferta de lotes de claves de Steam en TF2 Keys",
+    title="SteamTrades & Keys Valuation API",
+    description="API para la valoración, arbitraje y contraofertas de ofertas de claves de Steam en TF2 Keys",
     version="2.0.0",
     lifespan=lifespan
 )

@@ -1,6 +1,11 @@
 /* Estilos personalizados */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
 body {
   font-family: 'Inter', sans-serif;
 }
@@ -29,7 +34,7 @@ body {
   overflow: hidden;
 }
 
-/* Estados activos visibles y claros para filtros (Sin colores cyan) */
+/* Estados activos visibles y claros para filtros */
 .filter-btn {
   transition: all 0.2s ease;
 }
@@ -43,19 +48,11 @@ body {
 }
 
 #filter-delisted.active {
-  background-color: rgba(76, 5, 25, 0.8) !important;
-  color: #fecdd3 !important;
-  border-color: #be123c !important;
-  font-weight: 700 !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(244, 63, 94, 0.4);
-}
-
-#filter-huge-margin.active {
-  background-color: rgba(69, 26, 3, 0.8) !important;
+  background-color: rgba(69, 26, 3, 0.75) !important;
   color: #fde68a !important;
-  border-color: #b45309 !important;
+  border-color: #d97706 !important;
   font-weight: 700 !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(245, 158, 11, 0.35);
 }
 
 #filter-sold.active {

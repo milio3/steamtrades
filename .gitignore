@@ -17,11 +17,17 @@ htmlcov/
 
 # Bases de Datos Persistentes (los datos no se suben a Git)
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
+*.bak
 data/*.db
+data/*.db-wal
+data/*.db-shm
 data/*.sqlite
 data/*.sqlite3
+data/*.bak
 
 # Almacenamiento Efímero / Persistente
 uploads/

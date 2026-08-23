@@ -7,7 +7,7 @@ let reviewedMap = {};  // Map: gameId -> boolean (estado revisado)
 let selectedGameId = null;
 
 // Estado de ordenación de la tabla
-let currentTableSort = { field: 'index', order: 'asc' };
+let currentTableSort = { field: 'id', order: 'asc' };
 
 const tableBody = document.getElementById('table-body');
 const searchInput = document.getElementById('search-table-input');
@@ -16,18 +16,20 @@ const tf2CashBadge = document.getElementById('tf2-cash-badge');
 
 // Elementos de Estadísticas
 const statOrigKeys = document.getElementById('stat-orig-keys');
+const statOrigCash = document.getElementById('stat-orig-cash');
 const statCounterKeys = document.getElementById('stat-counter-keys');
 const statCounterCash = document.getElementById('stat-counter-cash');
 const statGainKeys = document.getElementById('stat-gain-keys');
 const statGainCash = document.getElementById('stat-gain-cash');
 const statReviewedCount = document.getElementById('stat-reviewed-count');
 const statTotalGamesCount = document.getElementById('stat-total-games-count');
+const statTableTotalCount = document.getElementById('stat-table-total-count');
 
 // Botones
-const btnReviewAll = document.getElementById('btn-review-all');
 const btnIncreaseAll = document.getElementById('btn-increase-all');
 const btnResetAll = document.getElementById('btn-reset-all');
-const btnCopyBottom = document.getElementById('btn-copy-counter-bottom');
+const btnImportCsv = document.getElementById('btn-import-csv');
+const inputCsvImport = document.getElementById('input-csv-import');
 const btnExportCsv = document.getElementById('btn-export-csv');
 
 // Modal Añadir Juego
@@ -38,7 +40,7 @@ const btnCancelAdd = document.getElementById('btn-cancel-add');
 const btnSubmitAdd = document.getElementById('btn-submit-add');
 const inputSteamUrl = document.getElementById('input-steam-url');
 const inputTf2Keys = document.getElementById('input-tf2-keys');
-const inputLotName = document.getElementById('input-lot-name');
+const inputBuyerName = document.getElementById('input-buyer-name');
 
 // Modal de Edición de Juego
 const editModal = document.getElementById('edit-modal');
@@ -52,7 +54,7 @@ const editKeyshopPrice = document.getElementById('edit-keyshop-price');
 const editOfficialPrice = document.getElementById('edit-official-price');
 const editHistKeyshop = document.getElementById('edit-hist-keyshop');
 const editHistOfficial = document.getElementById('edit-hist-official');
-const editLotName = document.getElementById('edit-lot-name');
+const editBuyerName = document.getElementById('edit-buyer-name');
 const editIsSold = document.getElementById('edit-is-sold');
 const editSoldCurrency = document.getElementById('edit-sold-currency');
 const editSoldPrice = document.getElementById('edit-sold-price');
@@ -63,6 +65,18 @@ const soldBadge = document.getElementById('sold-badge');
 const editForm = document.getElementById('edit-form');
 const btnCloseModal = document.getElementById('btn-close-modal');
 const btnCancelModal = document.getElementById('btn-cancel-modal');
+
+// Modal de Confirmación de Importación CSV
+const modalConfirmImport = document.getElementById('modal-confirm-import-csv');
+const btnCloseImportModal = document.getElementById('btn-close-import-modal');
+const btnCancelImportCsv = document.getElementById('btn-cancel-import-csv');
+const btnApplyImportCsv = document.getElementById('btn-apply-import-csv');
+const importStatSoldCount = document.getElementById('import-stat-sold-count');
+const importStatPendingCount = document.getElementById('import-stat-pending-count');
+const importStatListedCount = document.getElementById('import-stat-listed-count');
+const importStatTotalRows = document.getElementById('import-stat-total-rows');
+const importPreviewList = document.getElementById('import-preview-list');
+let pendingImportRows = [];
 
 const FALLBACK_GAME_SVG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDY0IDMyIiBmaWxsPSIjMWUyOTNiIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iMzIiIHJ4PSI0Ii8+PHBhdGggZD0iTTI0IDEwaC0ydjRoLTR2Mmg0djRoMnYtNGg0di0yaC00di00em0xNCAyYTEuNSAxLjUgMCAxIDEtMyAwIDEuNSAxLjUgMCAwIDEgMyAwem00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bS00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bTQtOGExLjUgMS41IDAgMSAxLTMgMCAxLjUgMS41IDAgMCAxIDMgMHoiIGZpbGw9IiM2NDc0OGIiLz48L3N2Zz4=";
 
@@ -86,10 +100,21 @@ async function initData() {
       tf2SteamPrice = summary.tf2_steam_price;
       if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
       if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
+      const tf2LastUpdateEl = document.getElementById('tf2-last-update');
+      if (tf2LastUpdateEl) {
+        if (summary.last_tf2_update) {
+          tf2LastUpdateEl.textContent = `(${summary.last_tf2_update})`;
+          tf2LastUpdateEl.title = `Última cotización oficial: ${summary.last_tf2_update}`;
+        } else {
+          tf2LastUpdateEl.textContent = '';
+        }
+      }
     }
 
     const resGames = await fetch('/api/games');
-    games = await resGames.json();
+    const allGames = await resGames.json();
+    // Excluir juegos vendidos e incidencias: la tabla es exclusivamente para negociación activa
+    games = allGames.filter(g => g.status !== 'sold' && !g.is_sold && g.status !== 'issue');
 
     // Cargar progreso persistido de la base de datos
     games.forEach(g => {
@@ -103,14 +128,14 @@ async function initData() {
 
     // Complementar con localStorage si existe
     try {
-      const savedInc = localStorage.getItem('steamkeys_key_increases');
+      const savedInc = localStorage.getItem('steamtrades_key_increases') || localStorage.getItem('steamkeys_key_increases');
       if (savedInc) {
         const parsed = JSON.parse(savedInc);
         Object.keys(parsed).forEach(k => {
           if (keyIncreases[k] === undefined) keyIncreases[k] = parsed[k];
         });
       }
-      const savedRev = localStorage.getItem('steamkeys_reviewed_map');
+      const savedRev = localStorage.getItem('steamtrades_reviewed_map') || localStorage.getItem('steamkeys_reviewed_map');
       if (savedRev) {
         const parsed = JSON.parse(savedRev);
         Object.keys(parsed).forEach(k => {
@@ -130,8 +155,8 @@ async function initData() {
 
 function saveStoredData() {
   try {
-    localStorage.setItem('steamkeys_key_increases', JSON.stringify(keyIncreases));
-    localStorage.setItem('steamkeys_reviewed_map', JSON.stringify(reviewedMap));
+    localStorage.setItem('steamtrades_key_increases', JSON.stringify(keyIncreases));
+    localStorage.setItem('steamtrades_reviewed_map', JSON.stringify(reviewedMap));
   } catch (e) {}
 
   // Sincronizar en segundo plano con el backend
@@ -146,19 +171,6 @@ function setupEvents() {
   if (searchInput) {
     searchInput.addEventListener('input', () => {
       renderTable();
-    });
-  }
-
-  if (btnReviewAll) {
-    btnReviewAll.addEventListener('click', () => {
-      const allReviewed = games.length > 0 && games.every(g => reviewedMap[g.id]);
-      games.forEach(g => {
-        reviewedMap[g.id] = !allReviewed;
-      });
-      saveStoredData();
-      renderTable();
-      calculateTotals();
-      showToast(!allReviewed ? "Todos los juegos marcados como revisados." : "Estado de revisión restablecido a pendiente.", "info");
     });
   }
 
@@ -185,7 +197,26 @@ function setupEvents() {
     });
   }
 
-  if (btnCopyBottom) btnCopyBottom.addEventListener('click', copyCounterOfferText);
+  if (btnImportCsv && inputCsvImport) {
+    btnImportCsv.addEventListener('click', () => {
+      inputCsvImport.value = '';
+      inputCsvImport.click();
+    });
+    inputCsvImport.addEventListener('change', handleCsvFileSelect);
+  }
+
+  const closeImportModal = () => {
+    if (modalConfirmImport) {
+      modalConfirmImport.classList.add('hidden');
+      modalConfirmImport.classList.remove('flex');
+    }
+    pendingImportRows = [];
+  };
+
+  if (btnCloseImportModal) btnCloseImportModal.addEventListener('click', closeImportModal);
+  if (btnCancelImportCsv) btnCancelImportCsv.addEventListener('click', closeImportModal);
+  if (btnApplyImportCsv) btnApplyImportCsv.addEventListener('click', applyImportCsv);
+
   if (btnExportCsv) btnExportCsv.addEventListener('click', exportToCsv);
 
   // Modal Añadir Juego
@@ -193,7 +224,7 @@ function setupEvents() {
     btnOpenAddModal.addEventListener('click', () => {
       if (inputSteamUrl) inputSteamUrl.value = '';
       if (inputTf2Keys) inputTf2Keys.value = '1.0';
-      if (inputLotName) inputLotName.value = '';
+      if (inputBuyerName) inputBuyerName.value = '';
       if (modalAddGame) {
         modalAddGame.classList.remove('hidden');
         modalAddGame.classList.add('flex');
@@ -215,7 +246,7 @@ function setupEvents() {
     btnSubmitAdd.addEventListener('click', async () => {
       const steamUrl = inputSteamUrl ? inputSteamUrl.value.trim() : '';
       const tf2Keys = inputTf2Keys ? parseFloat(inputTf2Keys.value) : 1.0;
-      const lot = inputLotName ? (inputLotName.value.trim() || 'xMjalino') : 'xMjalino';
+      const buyer = inputBuyerName ? (inputBuyerName.value.trim() || 'xMjalino') : 'xMjalino';
 
       if (!steamUrl) {
         showToast("Introduce una URL válida de Steam.", "warning");
@@ -229,7 +260,7 @@ function setupEvents() {
         const res = await fetch('/api/games/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ steam_url: steamUrl, tf2_keys_offered: tf2Keys, lot_name: lot })
+          body: JSON.stringify({ steam_url: steamUrl, tf2_keys_offered: tf2Keys, buyer_name: buyer })
         });
 
         const data = await res.json();
@@ -280,7 +311,7 @@ function setupEvents() {
           if (soldBadge) soldBadge.classList.remove('hidden');
           // Precargar con contraoferta o oferta original si está vacío
           if (editSoldPrice && !editSoldPrice.value) {
-            const curGame = games.find(g => g.id === selectedGameId);
+            const curGame = games.find(g => String(g.id) === String(selectedGameId));
             if (curGame) editSoldPrice.value = getEffectiveOffer(curGame);
           }
         } else {
@@ -338,7 +369,7 @@ function handleSortTable(field) {
     currentTableSort.order = currentTableSort.order === 'asc' ? 'desc' : 'asc';
   } else {
     currentTableSort.field = field;
-    currentTableSort.order = (field === 'name' || field === 'index' || field === 'lot') ? 'asc' : 'desc';
+    currentTableSort.order = (field === 'name' || field === 'index' || field === 'buyer') ? 'asc' : 'desc';
   }
 
   updateSortIcons();
@@ -346,7 +377,7 @@ function handleSortTable(field) {
 }
 
 function updateSortIcons() {
-  const fields = ['index', 'name', 'lot', 'players', 'min_current', 'floor', 'orig_tf2', 'increase', 'counter_tf2', 'balance', 'improvement', 'reviewed'];
+  const fields = ['id', 'name', 'buyer', 'players', 'min_current', 'floor', 'orig_tf2', 'increase', 'counter_tf2', 'balance', 'improvement', 'reviewed'];
   fields.forEach(f => {
     const icon = document.getElementById(`sort-icon-${f}`);
     if (!icon) return;
@@ -383,8 +414,8 @@ function renderTable() {
     switch (field) {
       case 'name':
         return mult * a.name.localeCompare(b.name);
-      case 'lot':
-        return mult * (a.lot_name || 'xMjalino').localeCompare(b.lot_name || 'xMjalino');
+      case 'buyer':
+        return mult * (a.buyer_name || 'xMjalino').localeCompare(b.buyer_name || 'xMjalino');
       case 'players':
         return mult * ((a.steam_players_24h || 0) - (b.steam_players_24h || 0));
       case 'min_current':
@@ -403,9 +434,10 @@ function renderTable() {
         return mult * (getImprovementPct(a) - getImprovementPct(b));
       case 'reviewed':
         return mult * ((reviewedMap[a.id] ? 1 : 0) - (reviewedMap[b.id] ? 1 : 0));
+      case 'id':
       case 'index':
       default:
-        return mult * (games.indexOf(a) - games.indexOf(b));
+        return mult * (Number(a.id) - Number(b.id));
     }
   });
 
@@ -510,9 +542,9 @@ function renderTable() {
       improvementHtml = `<span class="text-slate-500 text-[11px] font-mono">0.0%</span>`;
     }
 
-    // Delisted y Sold badges
+    // Delisted (Coleccionista) y Sold badges
     const delistedIcon = game.is_delisted_steam 
-      ? `<span class="text-[9px] bg-rose-950 text-rose-300 border border-rose-800/80 font-semibold px-1.5 py-0.5 rounded ml-1.5 inline-flex items-center gap-0.5" title="Deslistado de Steam"><i class="fa-solid fa-triangle-exclamation text-rose-400"></i> Delisted</span>` 
+      ? `<span class="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-600/70 font-semibold px-1.5 py-0.5 rounded ml-1.5 inline-flex items-center gap-0.5" title="Juego retirado de Steam (Artículo de Coleccionista)"><i class="fa-solid fa-crown text-amber-400"></i> Coleccionista</span>` 
       : '';
 
     let soldIconText = '';
@@ -551,7 +583,7 @@ function renderTable() {
       : `w-16 bg-slate-950 border ${increaseTf2 > 0 ? 'border-slate-500 text-slate-100 font-bold' : 'border-slate-800 text-slate-300'} rounded-lg px-1.5 py-1 text-center font-mono text-xs focus:outline-none focus:border-slate-500 transition`;
 
     row.innerHTML = `
-      <td class="p-2.5 pl-3 text-center text-slate-500 font-mono text-[11px]">${games.indexOf(game) + 1}</td>
+      <td class="p-2.5 pl-3 text-center text-slate-400 font-mono text-xs font-semibold" title="ID de Oferta: ${game.id}">${game.id}</td>
       <td class="p-2.5 font-medium text-slate-100">
         <div class="flex items-center gap-2.5">
           <img src="${headerImg}" onclick="openEditModal('${game.id}')" class="w-10 h-5 object-cover rounded-md flex-shrink-0 shadow-sm border border-slate-800 cursor-pointer hover:ring-1 hover:ring-blue-500" onerror="this.onerror=null; this.src='${FALLBACK_GAME_SVG}'" title="Haz clic para editar juego">
@@ -563,11 +595,11 @@ function renderTable() {
         </div>
       </td>
 
-      <!-- Lote (Columna Dedicada) -->
+      <!-- Comprador (Columna Dedicada) -->
       <td class="p-2.5 text-center">
-        <span class="text-[10px] bg-slate-950 text-slate-300 border border-slate-800 font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 shadow-sm" title="Lote: ${escapeHtml(game.lot_name || 'xMjalino')}">
-          <i class="fa-solid fa-layer-group text-[9px] text-indigo-400"></i>
-          <span>${escapeHtml(game.lot_name || 'xMjalino')}</span>
+        <span class="text-[10px] bg-slate-950 text-slate-300 border border-slate-800 font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 shadow-sm" title="Comprador: ${escapeHtml(game.buyer_name || 'Sin comprador')}">
+          <i class="fa-solid fa-user text-[9px] text-indigo-400"></i>
+          <span>${escapeHtml(game.buyer_name || '-')}</span>
         </span>
       </td>
       
@@ -632,10 +664,30 @@ function renderTable() {
   });
 }
 
+function toggleReviewed(gameId) {
+  const gid = isNaN(Number(gameId)) ? gameId : Number(gameId);
+  const isCurrentlyRev = !!reviewedMap[gid] || !!reviewedMap[gameId];
+  
+  if (isCurrentlyRev) {
+    delete reviewedMap[gid];
+    delete reviewedMap[gameId];
+  } else {
+    reviewedMap[gid] = true;
+    reviewedMap[gameId] = true;
+  }
+  
+  saveStoredData();
+  calculateTotals();
+  renderTable();
+}
+
 function handleIncreaseInput(gameId, value) {
+  const gid = isNaN(Number(gameId)) ? gameId : Number(gameId);
   if (value === '' || isNaN(value) || parseFloat(value) <= 0) {
+    delete keyIncreases[gid];
     delete keyIncreases[gameId];
   } else {
+    keyIncreases[gid] = parseFloat(value);
     keyIncreases[gameId] = parseFloat(value);
   }
   
@@ -645,7 +697,7 @@ function handleIncreaseInput(gameId, value) {
 }
 
 function updateRowCells(gameId) {
-  const game = games.find(g => g.id === gameId);
+  const game = games.find(g => String(g.id) === String(gameId));
   if (!game) return;
 
   const origTf2 = Number(game.tf2_keys_offered);
@@ -735,13 +787,15 @@ function calculateTotals() {
     }
   });
 
+  const origCash = totalOrigKeys * tf2CashPrice;
   const counterCash = totalCounterKeys * tf2CashPrice;
   const diffKeys = totalCounterKeys - totalOrigKeys;
   const diffCash = diffKeys * tf2CashPrice;
 
   if (statOrigKeys) statOrigKeys.textContent = `${totalOrigKeys.toFixed(2)} TF2`;
+  if (statOrigCash) statOrigCash.textContent = `(${origCash.toFixed(2)} €)`;
   if (statCounterKeys) statCounterKeys.textContent = `${totalCounterKeys.toFixed(2)} TF2`;
-  if (statCounterCash) statCounterCash.textContent = `(~${counterCash.toFixed(2)} €)`;
+  if (statCounterCash) statCounterCash.textContent = `(${counterCash.toFixed(2)} €)`;
 
   if (statGainKeys) {
     statGainKeys.textContent = `${diffKeys >= 0 ? '+' : ''}${diffKeys.toFixed(2)} TF2`;
@@ -753,12 +807,13 @@ function calculateTotals() {
 
   if (statReviewedCount) statReviewedCount.textContent = reviewedCount;
   if (statTotalGamesCount) statTotalGamesCount.textContent = games.length;
+  if (statTableTotalCount) statTableTotalCount.textContent = games.length;
 }
 
 // Modal de edición
 function openEditModal(gameId) {
   selectedGameId = gameId;
-  const game = games.find(g => g.id === gameId);
+  const game = games.find(g => String(g.id) === String(gameId));
   if (!game) return;
 
   if (modalTitle) modalTitle.textContent = game.name;
@@ -775,7 +830,7 @@ function openEditModal(gameId) {
   if (editOfficialPrice) editOfficialPrice.value = game.ggdeals_current_official || game.steam_store_price || '';
   if (editHistKeyshop) editHistKeyshop.value = game.ggdeals_historical_keyshop_low || '';
   if (editHistOfficial) editHistOfficial.value = game.ggdeals_historical_official_low || '';
-  if (editLotName) editLotName.value = game.lot_name || 'xMjalino';
+  if (editBuyerName) editBuyerName.value = game.buyer_name || 'xMjalino';
 
   // Estado de vendido
   const isSold = !!game.is_sold;
@@ -824,7 +879,7 @@ async function saveModalData() {
   const soldCurr = editSoldCurrency ? editSoldCurrency.value : 'TF2';
   const soldPriceVal = isSold && editSoldPrice && editSoldPrice.value ? parseFloat(editSoldPrice.value) : null;
   const soldNoteVal = isSold && editSoldNote && editSoldNote.value.trim() ? editSoldNote.value.trim() : null;
-  const lot = editLotName ? (editLotName.value.trim() || 'xMjalino') : 'xMjalino';
+  const buyer = editBuyerName ? (editBuyerName.value.trim() || 'xMjalino') : 'xMjalino';
 
   const payload = {
     tf2_keys_offered: parseFloat(editTf2Keys.value) || 0,
@@ -837,7 +892,7 @@ async function saveModalData() {
     sold_price: soldPriceVal,
     sold_tf2_keys: soldCurr === 'TF2' ? soldPriceVal : null,
     sold_note: soldNoteVal,
-    lot_name: lot
+    buyer_name: buyer
   };
 
   try {
@@ -878,59 +933,50 @@ function copyCounterOfferText() {
 }
 
 function exportToCsv() {
-  const reviewedGames = games.filter(g => reviewedMap[g.id]);
-
-  if (reviewedGames.length === 0) {
-    showToast("Debes marcar al menos un juego como revisado para exportar.", "warning");
+  if (!games || games.length === 0) {
+    showToast("No hay juegos en la tabla para exportar.", "warning");
     return;
   }
 
-  if (reviewedGames.length < games.length) {
-    showToast(`Exportando únicamente los ${reviewedGames.length} juegos revisados.`, "info");
-  } else {
-    showToast(`Exportando todos los ${reviewedGames.length} juegos revisados.`, "success");
-  }
-
-  // Formateador de números con coma como separador decimal
+  // Formateador de números (usamos punto o valor numérico directo compatible)
   const formatDecimal = (val) => {
     if (val === null || val === undefined || val === '') return '';
     const num = typeof val === 'number' ? val : parseFloat(val);
     if (isNaN(num)) return '';
-    return num.toString().replace('.', ',');
+    return num.toString();
   };
 
-  // Cabeceras con separador de campos punto y coma (;)
-  let csv = "Game;Received Offer (TF2);Counter Offer (TF2);Final Price (TF2)\r\n";
+  // Cabeceras exactas de la plantilla solicitada
+  let csv = "GameID;Game;Buyer;Offer;CounterOffer;Increment;Revised;Accepted;SoldCurrecy;SoldPrice\r\n";
   
-  reviewedGames.forEach(g => {
-    const origTf2 = Number(g.tf2_keys_offered);
-    const incTf2 = getIncrease(g);
-    const effectiveTf2 = getEffectiveOffer(g);
-
-    // Si la contraoferta no aumenta y estamos de acuerdo, se deja en blanco
-    const counterOfferCell = incTf2 > 0 ? formatDecimal(effectiveTf2) : "";
-    let finalPriceCell = "";
-    if (g.is_sold) {
-      if (g.sold_currency === 'EUR' && g.sold_price !== null && g.sold_price !== undefined) {
-        finalPriceCell = `${formatDecimal(g.sold_price)} €`;
-      } else {
-        const pVal = g.sold_price !== null && g.sold_price !== undefined ? g.sold_price : (g.sold_tf2_keys || effectiveTf2);
-        finalPriceCell = `${formatDecimal(pVal)} TF2`;
-      }
-      if (g.sold_note) {
-        finalPriceCell += ` (${g.sold_note.replace(/;/g, ' - ')})`;
-      }
-    } else {
-      finalPriceCell = formatDecimal(effectiveTf2);
-    }
-
-    // Aseguramos que el nombre no contenga ';' y escapamos comillas dobles
+  games.forEach(g => {
+    const gameId = g.id;
     const cleanName = (g.name || '')
       .replace(/;/g, ' - ')
       .replace(/"/g, '""')
       .trim();
+    const cleanBuyer = (g.buyer_name || 'xMjalino')
+      .replace(/;/g, ' - ')
+      .replace(/"/g, '""')
+      .trim();
 
-    csv += `"${cleanName}";${formatDecimal(origTf2)};${counterOfferCell};"${finalPriceCell}"\r\n`;
+    const offer = Number(g.tf2_keys_offered || g.offer_price || 0);
+    const increment = getIncrease(g);
+    const counterOffer = offer + increment;
+    const revised = reviewedMap[g.id] ? 1 : 0;
+    const accepted = g.is_sold ? 1 : 0;
+    const soldCurrency = g.sold_currency || 'TF2';
+    
+    let soldPrice = '';
+    if (g.is_sold) {
+      if (g.sold_price !== null && g.sold_price !== undefined) {
+        soldPrice = g.sold_price;
+      } else {
+        soldPrice = g.sold_tf2_keys || counterOffer;
+      }
+    }
+
+    csv += `"${gameId}";"${cleanName}";"${cleanBuyer}";${formatDecimal(offer)};${formatDecimal(counterOffer)};${formatDecimal(increment)};${revised};${accepted};"${soldCurrency}";${formatDecimal(soldPrice)}\r\n`;
   });
 
   // BOM UTF-8 (\uFEFF) para compatibilidad nativa con Microsoft Excel en español/Windows
@@ -938,10 +984,213 @@ function exportToCsv() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `steam_keys_offer_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `steamtrades_table_${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+
+  showToast(`¡Tabla exportada con éxito! (${games.length} juegos)`, "success");
+}
+
+function parseCsvLine(text) {
+  let p = '', row = [''], i = 0, r = true;
+  for (let c of text) {
+    if (c === '"') {
+      if (r && p === '"') row[i] += '"';
+      r = !r;
+    } else if (c === ';' && r) {
+      c = row[++i] = '';
+    } else {
+      row[i] += c;
+    }
+    p = c;
+  }
+  return row.map(s => s ? s.trim() : '');
+}
+
+async function handleCsvFileSelect(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    try {
+      let content = evt.target.result;
+      if (content.charCodeAt(0) === 0xFEFF) {
+        content = content.slice(1);
+      }
+
+      const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
+      if (lines.length < 2) {
+        showToast("El archivo CSV no contiene registros suficientes.", "warning");
+        return;
+      }
+
+      const headerRow = parseCsvLine(lines[0]).map(h => h.replace(/^["']|["']$/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+      
+      // Encontrar índices de columnas
+      const idIdx = headerRow.findIndex(h => h.includes('gameid') || h === 'id');
+      const nameIdx = headerRow.findIndex(h => h === 'game' || h.includes('gamename') || h.includes('nombre'));
+      const buyerIdx = headerRow.findIndex(h => h.includes('buyer') || h.includes('comprador'));
+      const offerIdx = headerRow.findIndex(h => h === 'offer' || h.includes('oferta'));
+      const counterIdx = headerRow.findIndex(h => h.includes('counter') || h.includes('contraoferta'));
+      const incIdx = headerRow.findIndex(h => h.includes('increment') || h.includes('aumento'));
+      const revIdx = headerRow.findIndex(h => h.includes('revis') || h.includes('revised'));
+      const accIdx = headerRow.findIndex(h => h.includes('accept') || h.includes('sold') || h.includes('acept'));
+      const currIdx = headerRow.findIndex(h => h.includes('currec') || h.includes('curren') || h.includes('moneda') || h.includes('divisa'));
+      const priceIdx = headerRow.findIndex(h => h.includes('soldprice') || h.includes('precio'));
+
+      if (idIdx === -1 && nameIdx === -1) {
+        showToast("Formato de CSV no reconocido: falta columna GameID o Game.", "error");
+        return;
+      }
+
+      const parseNumber = (val) => {
+        if (!val) return null;
+        const clean = val.replace(/^["']|["']$/g, '').replace(',', '.').trim();
+        const num = parseFloat(clean);
+        return isNaN(num) ? null : num;
+      };
+
+      const parseBool = (val) => {
+        if (!val) return false;
+        const clean = val.replace(/^["']|["']$/g, '').trim().toLowerCase();
+        return clean === '1' || clean === 'true' || clean === 'si' || clean === 'sí' || clean === 'yes';
+      };
+
+      const rowsToImport = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        if (cols.length === 0 || !cols.some(c => c.length > 0)) continue;
+
+        const rawId = idIdx !== -1 && cols[idIdx] ? cols[idIdx].replace(/^["']|["']$/g, '').trim() : null;
+        const gameId = rawId ? parseInt(rawId, 10) : null;
+        const gameName = nameIdx !== -1 && cols[nameIdx] ? cols[nameIdx].replace(/^["']|["']$/g, '').trim() : null;
+
+        if (!gameId && !gameName) continue;
+
+        const buyer = buyerIdx !== -1 && cols[buyerIdx] ? cols[buyerIdx].replace(/^["']|["']$/g, '').trim() : null;
+        const offer = offerIdx !== -1 ? parseNumber(cols[offerIdx]) : null;
+        const counterOffer = counterIdx !== -1 ? parseNumber(cols[counterIdx]) : null;
+        const increment = incIdx !== -1 ? parseNumber(cols[incIdx]) : null;
+        const revised = revIdx !== -1 ? parseBool(cols[revIdx]) : false;
+        const accepted = accIdx !== -1 ? parseBool(cols[accIdx]) : false;
+        const soldCurrency = currIdx !== -1 && cols[currIdx] ? cols[currIdx].replace(/^["']|["']$/g, '').trim().toUpperCase() : 'TF2';
+        const soldPrice = priceIdx !== -1 ? parseNumber(cols[priceIdx]) : null;
+
+        rowsToImport.push({
+          game_id: gameId || 0,
+          game_name: gameName,
+          buyer: buyer,
+          offer: offer,
+          counter_offer: counterOffer,
+          increment: increment,
+          revised: revised,
+          accepted: accepted,
+          sold_currency: soldCurrency,
+          sold_price: soldPrice
+        });
+      }
+
+      if (rowsToImport.length === 0) {
+        showToast("No se encontraron filas válidas en el archivo CSV.", "warning");
+        return;
+      }
+
+      pendingImportRows = rowsToImport;
+
+      // Calcular estadísticas previas
+      const soldRows = rowsToImport.filter(r => r.accepted === true);
+      const pendingRows = rowsToImport.filter(r => r.accepted === false && r.revised === true);
+      const listedRows = rowsToImport.filter(r => r.accepted === false && r.revised === false);
+
+      if (importStatTotalRows) importStatTotalRows.textContent = rowsToImport.length;
+      if (importStatSoldCount) importStatSoldCount.textContent = soldRows.length;
+      if (importStatPendingCount) importStatPendingCount.textContent = pendingRows.length;
+      if (importStatListedCount) importStatListedCount.textContent = listedRows.length;
+
+      // Generar vista previa con desglose
+      if (importPreviewList) {
+        importPreviewList.innerHTML = rowsToImport.map(r => {
+          let badgeHtml = '';
+          if (r.accepted === true) {
+            const pVal = r.sold_price !== null ? r.sold_price : (r.counter_offer !== null ? r.counter_offer : r.offer);
+            badgeHtml = `<span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-semibold text-[10px]">Vendido: ${pVal} ${escapeHtml(r.sold_currency || 'TF2')}</span>`;
+          } else if (r.revised === true) {
+            const inc = r.increment !== null ? r.increment : 0;
+            badgeHtml = `<span class="px-2 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-700/60 font-semibold text-[10px]">Tramitado (+${inc} TF2)</span>`;
+          } else {
+            badgeHtml = `<span class="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-700 font-semibold text-[10px]">Listado</span>`;
+          }
+
+          return `
+            <div class="flex items-center justify-between p-1.5 bg-slate-950/60 rounded-lg border border-slate-800/80 gap-2 hover:bg-slate-950 transition">
+              <div class="flex items-center gap-2 truncate min-w-0">
+                <span class="text-slate-500 font-mono font-bold text-[10px]">#${r.game_id}</span>
+                <span class="text-slate-200 font-sans truncate font-medium text-xs">${escapeHtml(r.game_name || 'Juego')}</span>
+                <span class="text-slate-500 text-[10px]">(${escapeHtml(r.buyer || 'xMjalino')})</span>
+              </div>
+              <div class="flex-shrink-0">
+                ${badgeHtml}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Mostrar modal de confirmación
+      if (modalConfirmImport) {
+        modalConfirmImport.classList.remove('hidden');
+        modalConfirmImport.classList.add('flex');
+      }
+    } catch (err) {
+      console.error("Error parsing CSV", err);
+      showToast("Error al leer y procesar el archivo CSV.", "error");
+    }
+  };
+
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function applyImportCsv() {
+  if (!pendingImportRows || pendingImportRows.length === 0) {
+    showToast("No hay registros pendientes de importar.", "warning");
+    return;
+  }
+
+  if (btnApplyImportCsv) {
+    btnApplyImportCsv.disabled = true;
+    btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Aplicando...`;
+  }
+
+  try {
+    const response = await fetch('/api/games/import-csv', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: pendingImportRows })
+    });
+
+    const resData = await response.json();
+    if (response.ok && resData.status === 'ok') {
+      if (modalConfirmImport) {
+        modalConfirmImport.classList.add('hidden');
+        modalConfirmImport.classList.remove('flex');
+      }
+      pendingImportRows = [];
+      showToast(`¡Se importaron y aplicaron ${resData.updated_count} cambios con éxito!`, "success");
+      await initData();
+    } else {
+      showToast(resData.detail || 'Error al importar los datos del CSV.', "error");
+    }
+  } catch (err) {
+    console.error("Error applying CSV import", err);
+    showToast("Error al aplicar la importación de datos en el servidor.", "error");
+  } finally {
+    if (btnApplyImportCsv) {
+      btnApplyImportCsv.disabled = false;
+      btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-check"></i> Aplicar e Importar Cambios`;
+    }
+  }
 }
 
 function showToast(msg, type = "success") {
