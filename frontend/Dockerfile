@@ -9,24 +9,21 @@ COPY src/table.html /usr/share/nginx/html/table.html
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
-    location = / { \
-        root /usr/share/nginx/html; \
-        try_files /table.html =404; \
+    root /usr/share/nginx/html; \
+    index table.html index.html; \
+    location / { \
+        try_files $uri $uri/ /table.html; \
     } \
     location = /table { \
-        root /usr/share/nginx/html; \
         try_files /table.html =404; \
     } \
     location = /table.html { \
-        root /usr/share/nginx/html; \
         try_files /table.html =404; \
     } \
     location = /cards { \
-        root /usr/share/nginx/html; \
         try_files /index.html =404; \
     } \
     location = /index.html { \
-        root /usr/share/nginx/html; \
         try_files /index.html =404; \
     } \
     location = /favicon.ico { \
@@ -36,10 +33,12 @@ RUN echo 'server { \
         alias /usr/share/nginx/html/static/; \
         add_header Cache-Control "no-cache, must-revalidate"; \
     } \
-    location /api/ { \
-        proxy_pass http://backend:8000/api/; \
+    location /api { \
+        proxy_pass http://backend:8000; \
         proxy_set_header Host $host; \
         proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $scheme; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
