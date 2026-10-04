@@ -9,19 +9,32 @@ COPY src/table.html /usr/share/nginx/html/table.html
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
-    location / { \
+    location = / { \
         root /usr/share/nginx/html; \
-        try_files $uri $uri/ /index.html; \
+        try_files /table.html =404; \
     } \
     location = /table { \
         root /usr/share/nginx/html; \
         try_files /table.html =404; \
+    } \
+    location = /table.html { \
+        root /usr/share/nginx/html; \
+        try_files /table.html =404; \
+    } \
+    location = /cards { \
+        root /usr/share/nginx/html; \
+        try_files /index.html =404; \
+    } \
+    location = /index.html { \
+        root /usr/share/nginx/html; \
+        try_files /index.html =404; \
     } \
     location = /favicon.ico { \
         alias /usr/share/nginx/html/static/favicon.svg; \
     } \
     location /static/ { \
         alias /usr/share/nginx/html/static/; \
+        add_header Cache-Control "no-cache, must-revalidate"; \
     } \
     location /api/ { \
         proxy_pass http://backend:8000/api/; \
