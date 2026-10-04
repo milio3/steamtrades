@@ -119,28 +119,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initData() {
   try {
-    const resSummary = await fetch('/api/summary');
-    const summary = await resSummary.json();
-    if (summary && summary.tf2_cash_price) {
-      tf2CashPrice = summary.tf2_cash_price;
-      tf2SteamPrice = summary.tf2_steam_price;
-      if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
-      if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
-      if (tf2LiveBadgeFooter) tf2LiveBadgeFooter.textContent = `${tf2SteamPrice.toFixed(2)} €`;
-      if (tf2CashBadgeFooter) tf2CashBadgeFooter.textContent = `${tf2CashPrice.toFixed(2)} €`;
-      const tf2LastUpdateEl = document.getElementById('tf2-last-update');
-      if (tf2LastUpdateEl) {
-        if (summary.last_tf2_update) {
-          tf2LastUpdateEl.textContent = `(${summary.last_tf2_update})`;
-          tf2LastUpdateEl.title = `Última cotización oficial: ${summary.last_tf2_update}`;
-        } else {
-          tf2LastUpdateEl.textContent = '';
+    try {
+      const resSummary = await fetch('/api/summary');
+      if (resSummary.ok) {
+        const summary = await resSummary.json();
+        if (summary && summary.tf2_cash_price) {
+          tf2CashPrice = summary.tf2_cash_price;
+          tf2SteamPrice = summary.tf2_steam_price;
+          if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+          if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
+          if (tf2LiveBadgeFooter) tf2LiveBadgeFooter.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+          if (tf2CashBadgeFooter) tf2CashBadgeFooter.textContent = `${tf2CashPrice.toFixed(2)} €`;
+          const tf2LastUpdateEl = document.getElementById('tf2-last-update');
+          if (tf2LastUpdateEl) {
+            if (summary.last_tf2_update) {
+              tf2LastUpdateEl.textContent = `(${summary.last_tf2_update})`;
+              tf2LastUpdateEl.title = `Última cotización oficial: ${summary.last_tf2_update}`;
+            } else {
+              tf2LastUpdateEl.textContent = '';
+            }
+          }
         }
       }
+    } catch (errSum) {
+      console.warn("No se pudo cargar /api/summary:", errSum);
     }
 
     const resGames = await fetch('/api/games');
-    allGamesList = await resGames.json();
+    if (!resGames.ok) {
+      throw new Error(`Error en API /api/games: HTTP ${resGames.status}`);
+    }
+    const data = await resGames.json();
+    allGamesList = Array.isArray(data) ? data : [];
 
     // Cargar progreso persistido de la base de datos solo para juegos en negociación
     keyIncreases = {};
@@ -169,6 +179,7 @@ async function initData() {
     calculateTotals();
   } catch (err) {
     console.error("Error al cargar datos de la tabla:", err);
+    showToast(`Error al cargar catálogo: ${err.message}`, "error");
   }
 }
 
