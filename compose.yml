@@ -30,5 +30,4 @@ services:
     ports:
       - "${FRONTEND_PORT:-8333}:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
