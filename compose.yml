@@ -14,12 +14,6 @@ services:
       - DEFAULT_TF2_STEAM_PRICE=${DEFAULT_TF2_STEAM_PRICE:-2.02}
       - DEFAULT_TF2_CASH_PRICE=${DEFAULT_TF2_CASH_PRICE:-1.62}
       - DEFAULT_STEAM_FEE_PERCENT=${DEFAULT_STEAM_FEE_PERCENT:-13.03}
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   frontend:
     build:

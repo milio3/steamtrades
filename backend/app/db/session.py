@@ -11,9 +11,14 @@ if "sqlite" in DATABASE_URL:
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_con, connection_record):
         cursor = dbapi_con.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA synchronous=NORMAL;")
-        cursor.close()
+        try:
+            cursor.execute("PRAGMA journal_mode=DELETE;")
+            cursor.execute("PRAGMA busy_timeout=15000;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+        except Exception:
+            pass
+        finally:
+            cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

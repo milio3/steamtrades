@@ -10,7 +10,13 @@ from backend.app.api.routes import router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Inicialización automática de SQLite y sembrado de datos
-    init_database()
+    try:
+        init_database()
+        print("INFO: init_database() completado con éxito.")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"ERROR: Fallo durante init_database(): {e}")
     yield
 
 app = FastAPI(
