@@ -42,12 +42,16 @@ if FRONTEND_SRC_DIR.exists():
     app.mount("/static", StaticFiles(directory=FRONTEND_SRC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
-    def serve_cards_view():
-        return FileResponse(FRONTEND_SRC_DIR / "index.html")
+    def serve_main_view():
+        return FileResponse(FRONTEND_SRC_DIR / "table.html")
 
     @app.get("/table", include_in_schema=False)
     def serve_table_view():
         return FileResponse(FRONTEND_SRC_DIR / "table.html")
+
+    @app.get("/cards", include_in_schema=False)
+    def serve_cards_view():
+        return FileResponse(FRONTEND_SRC_DIR / "index.html")
 
     @app.get("/favicon.ico", include_in_schema=False)
     def serve_favicon():

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Float, Integer, Boolean, DateTime, ForeignKey, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from backend.app.db.session import Base
@@ -7,7 +7,8 @@ class Offer(Base):
     __tablename__ = 'offers'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    app_id = Column(Integer, ForeignKey('games.app_id', ondelete='CASCADE'), nullable=False, index=True)
+    app_id = Column(Integer, nullable=False, index=True)
+    bundle = Column(String(255), default="", nullable=False, index=True)
     
     # Comprador
     buyer_name = Column(String(100), nullable=True, index=True)
@@ -35,6 +36,10 @@ class Offer(Base):
     # Marcas de tiempo
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        ForeignKeyConstraint(['app_id', 'bundle'], ['games.app_id', 'games.bundle'], ondelete='CASCADE'),
+    )
 
     # Relación con Game
     game = relationship('Game', back_populates='offers')

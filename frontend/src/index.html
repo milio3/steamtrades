@@ -219,23 +219,42 @@
     </div>
   </aside>
 
-  <!-- Modal para Añadir Nuevo Juego por Link de Steam -->
+  <!-- Modal para Añadir Nuevo Juego (Omni-input: Nombre, URL o AppID) -->
   <div id="modal-add-game" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl shadow-2xl p-5 space-y-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl shadow-2xl p-5 space-y-4 relative">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <i class="fa-brands fa-steam text-slate-300 text-xl"></i>
-          <h3 class="font-bold text-sm text-slate-100">Añadir Juego por Link de Steam</h3>
+          <h3 class="font-bold text-sm text-slate-100">Añadir Juego</h3>
         </div>
         <button id="btn-close-add-modal" class="text-slate-400 hover:text-slate-200 text-lg">&times;</button>
       </div>
       
       <div class="space-y-3 text-xs">
-        <div>
-          <label class="block text-slate-300 font-semibold mb-1">URL de la Tienda de Steam:</label>
-          <input id="input-steam-url" type="url" placeholder="https://store.steampowered.com/app/620/Portal_2/" 
-                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono">
-          <p class="text-[11px] text-slate-500 mt-1">Se extraerán automáticamente precios, datos de GG.deals, estado y jugadores 24h.</p>
+        <div class="relative">
+          <label class="block text-slate-300 font-semibold mb-1">Nombre, URL o AppID de Steam:</label>
+          <div class="relative">
+            <input id="input-steam-url" type="text" autocomplete="off" placeholder="Ej: Cyberpunk 2077 o https://store.steampowered.com/app/..." 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono pr-8">
+            <div id="search-spinner" class="hidden absolute right-3 top-2.5 text-slate-400">
+              <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+            </div>
+          </div>
+          <!-- Dropdown con autocompletado en vivo -->
+          <div id="search-suggestions-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800">
+          </div>
+          <!-- Previsualización del juego detectado -->
+          <div id="add-game-preview-card" class="hidden mt-2 p-2 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center gap-2.5">
+            <img id="preview-img" src="" class="w-14 h-7 object-cover rounded shadow flex-shrink-0">
+            <div class="flex-1 min-w-0">
+              <div id="preview-name" class="font-bold text-slate-200 truncate">--</div>
+              <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                <span id="preview-appid">AppID: --</span>
+                <span id="preview-price" class="text-emerald-400">-- €</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Escribe para buscar o pega el enlace. Se obtendrán precios de Steam, GG.deals, Kinguin (ROW) y jugadores.</p>
         </div>
         
         <div class="grid grid-cols-2 gap-3">
@@ -258,6 +277,7 @@
           <i class="fa-solid fa-plus"></i> Añadir y Calcular
         </button>
       </div>
+
     </div>
   </div>
 

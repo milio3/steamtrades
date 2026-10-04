@@ -1,36 +1,49 @@
-// Estado de la tabla de contraoferta
+// Estado de la tabla y paginación
+const PAGE_SIZE = 15;
+let currentPage = 1;
 let games = [];
+let allGamesList = [];
+let currentTableFilter = 'listed';
 let tf2CashPrice = 1.62;
 let tf2SteamPrice = 2.02;
 let keyIncreases = {}; // Map: gameId -> float (incremento de llaves)
-let reviewedMap = {};  // Map: gameId -> boolean (estado revisado)
 let selectedGameId = null;
 
 // Estado de ordenación de la tabla
 let currentTableSort = { field: 'id', order: 'asc' };
 
 const tableBody = document.getElementById('table-body');
+const tableHead = document.getElementById('table-head');
 const searchInput = document.getElementById('search-table-input');
 const tf2LiveBadge = document.getElementById('tf2-live-badge');
 const tf2CashBadge = document.getElementById('tf2-cash-badge');
+const tf2LiveBadgeFooter = document.getElementById('tf2-live-badge-footer');
+const tf2CashBadgeFooter = document.getElementById('tf2-cash-badge-footer');
 
-// Elementos de Estadísticas
-const statOrigKeys = document.getElementById('stat-orig-keys');
-const statOrigCash = document.getElementById('stat-orig-cash');
-const statCounterKeys = document.getElementById('stat-counter-keys');
-const statCounterCash = document.getElementById('stat-counter-cash');
-const statGainKeys = document.getElementById('stat-gain-keys');
-const statGainCash = document.getElementById('stat-gain-cash');
-const statReviewedCount = document.getElementById('stat-reviewed-count');
-const statTotalGamesCount = document.getElementById('stat-total-games-count');
-const statTableTotalCount = document.getElementById('stat-table-total-count');
+// Elementos de Paginación
+const pageStartIdx = document.getElementById('page-start-idx');
+const pageEndIdx = document.getElementById('page-end-idx');
+const pageTotalCount = document.getElementById('page-total-count');
+const btnPrevPage = document.getElementById('btn-prev-page');
+const btnNextPage = document.getElementById('btn-next-page');
+const paginationPages = document.getElementById('pagination-pages');
 
-// Botones
-const btnIncreaseAll = document.getElementById('btn-increase-all');
-const btnResetAll = document.getElementById('btn-reset-all');
+// Elementos de Estadísticas Globales del Footer
+const statAvailableGames = document.getElementById('stat-available-games');
+const statPendingGames = document.getElementById('stat-pending-games');
+const statPendingOfferKeys = document.getElementById('stat-pending-offer-keys');
+const statPendingOfferCash = document.getElementById('stat-pending-offer-cash');
+const statSoldCount = document.getElementById('stat-sold-count');
+const statSoldTotalCash = document.getElementById('stat-sold-total-cash');
+
+// Botones de Cabecera y Consulta de Precios
+const btnSyncPrices = document.getElementById('btn-sync-prices');
+const btnSyncIcon = document.getElementById('btn-sync-icon');
+const btnSyncText = document.getElementById('btn-sync-text');
 const btnImportCsv = document.getElementById('btn-import-csv');
 const inputCsvImport = document.getElementById('input-csv-import');
 const btnExportCsv = document.getElementById('btn-export-csv');
+const btnSteamtradesTable = document.getElementById('btn-steamtrades-table');
 
 // Modal Añadir Juego
 const btnOpenAddModal = document.getElementById('btn-open-add-modal');
@@ -42,29 +55,29 @@ const inputSteamUrl = document.getElementById('input-steam-url');
 const inputTf2Keys = document.getElementById('input-tf2-keys');
 const inputBuyerName = document.getElementById('input-buyer-name');
 
-// Modal de Edición de Juego
+// Modal de Edición de Juego (Estilo Tarjeta Visual)
 const editModal = document.getElementById('edit-modal');
 const modalTitle = document.getElementById('modal-game-title');
 const modalGameImg = document.getElementById('modal-game-img');
 const modalGameAppId = document.getElementById('modal-game-appid');
 const editGameId = document.getElementById('edit-game-id');
-const editSteamUrl = document.getElementById('edit-steam-url');
+const editStatus = document.getElementById('edit-status');
 const editTf2Keys = document.getElementById('edit-tf2-keys');
-const editKeyshopPrice = document.getElementById('edit-keyshop-price');
-const editOfficialPrice = document.getElementById('edit-official-price');
-const editHistKeyshop = document.getElementById('edit-hist-keyshop');
-const editHistOfficial = document.getElementById('edit-hist-official');
 const editBuyerName = document.getElementById('edit-buyer-name');
-const editIsSold = document.getElementById('edit-is-sold');
 const editSoldCurrency = document.getElementById('edit-sold-currency');
 const editSoldPrice = document.getElementById('edit-sold-price');
 const editSoldCurrencyLabel = document.getElementById('edit-sold-currency-label');
 const editSoldNote = document.getElementById('edit-sold-note');
+const editIssueNote = document.getElementById('edit-issue-note');
 const soldKeysContainer = document.getElementById('sold-keys-container');
-const soldBadge = document.getElementById('sold-badge');
+const issueContainer = document.getElementById('issue-container');
 const editForm = document.getElementById('edit-form');
 const btnCloseModal = document.getElementById('btn-close-modal');
 const btnCancelModal = document.getElementById('btn-cancel-modal');
+const btnDeleteGame = document.getElementById('btn-delete-game');
+const btnModalSyncPrice = document.getElementById('btn-modal-sync-price');
+const modalSyncIcon = document.getElementById('modal-sync-icon');
+const modalSyncText = document.getElementById('modal-sync-text');
 
 // Modal de Confirmación de Importación CSV
 const modalConfirmImport = document.getElementById('modal-confirm-import-csv');
@@ -77,6 +90,19 @@ const importStatListedCount = document.getElementById('import-stat-listed-count'
 const importStatTotalRows = document.getElementById('import-stat-total-rows');
 const importPreviewList = document.getElementById('import-preview-list');
 let pendingImportRows = [];
+
+// Modal Generador de Tabla SteamTrades (Markdown)
+const modalSteamtradesExport = document.getElementById('modal-steamtrades-export');
+const btnCloseStModal = document.getElementById('btn-close-st-modal');
+const btnCancelStModal = document.getElementById('btn-cancel-st-modal');
+const btnCopyStMarkdown = document.getElementById('btn-copy-st-markdown');
+const btnDownloadStMarkdown = document.getElementById('btn-download-st-markdown');
+const stMarkdownOutput = document.getElementById('st-markdown-output');
+const stPreviewCount = document.getElementById('st-preview-count');
+const stCopyStatus = document.getElementById('st-copy-status');
+const stExportScope = document.getElementById('st-export-scope');
+const stExportPriceFormat = document.getElementById('st-export-price-format');
+const stExportSpacing = document.getElementById('st-export-spacing');
 
 const FALLBACK_GAME_SVG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDY0IDMyIiBmaWxsPSIjMWUyOTNiIj48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iMzIiIHJ4PSI0Ii8+PHBhdGggZD0iTTI0IDEwaC0ydjRoLTR2Mmg0djRoMnYtNGg0di0yaC00di00em0xNCAyYTEuNSAxLjUgMCAxIDEtMyAwIDEuNSAxLjUgMCAwIDEgMyAwem00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bS00IDRhMS41IDEuNSAwIDEgMS0zIDAgMS41IDEuNSAwIDAgMSAzIDB6bTQtOGExLjUgMS41IDAgMSAxLTMgMCAxLjUgMS41IDAgMCAxIDMgMHoiIGZpbGw9IiM2NDc0OGIiLz48L3N2Zz4=";
 
@@ -100,6 +126,8 @@ async function initData() {
       tf2SteamPrice = summary.tf2_steam_price;
       if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
       if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
+      if (tf2LiveBadgeFooter) tf2LiveBadgeFooter.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+      if (tf2CashBadgeFooter) tf2CashBadgeFooter.textContent = `${tf2CashPrice.toFixed(2)} €`;
       const tf2LastUpdateEl = document.getElementById('tf2-last-update');
       if (tf2LastUpdateEl) {
         if (summary.last_tf2_update) {
@@ -112,88 +140,256 @@ async function initData() {
     }
 
     const resGames = await fetch('/api/games');
-    const allGames = await resGames.json();
-    // Excluir juegos vendidos e incidencias: la tabla es exclusivamente para negociación activa
-    games = allGames.filter(g => g.status !== 'sold' && !g.is_sold && g.status !== 'issue');
+    allGamesList = await resGames.json();
 
-    // Cargar progreso persistido de la base de datos
-    games.forEach(g => {
-      if (g.counter_increase_tf2 && Number(g.counter_increase_tf2) > 0) {
+    // Cargar progreso persistido de la base de datos solo para juegos en negociación
+    keyIncreases = {};
+    allGamesList.forEach(g => {
+      if (g.status === 'pending' && g.counter_increase_tf2 && Number(g.counter_increase_tf2) > 0) {
         keyIncreases[g.id] = Number(g.counter_increase_tf2);
-      }
-      if (g.is_reviewed) {
-        reviewedMap[g.id] = true;
       }
     });
 
-    // Complementar con localStorage si existe
+    // Complementar con localStorage si existe (solo para juegos activos en negociación)
     try {
-      const savedInc = localStorage.getItem('steamtrades_key_increases') || localStorage.getItem('steamkeys_key_increases');
+      const savedInc = localStorage.getItem('steamtrades_key_increases');
       if (savedInc) {
         const parsed = JSON.parse(savedInc);
         Object.keys(parsed).forEach(k => {
-          if (keyIncreases[k] === undefined) keyIncreases[k] = parsed[k];
-        });
-      }
-      const savedRev = localStorage.getItem('steamtrades_reviewed_map') || localStorage.getItem('steamkeys_reviewed_map');
-      if (savedRev) {
-        const parsed = JSON.parse(savedRev);
-        Object.keys(parsed).forEach(k => {
-          if (reviewedMap[k] === undefined) reviewedMap[k] = parsed[k];
+          const matchingGame = allGamesList.find(g => String(g.id) === String(k) || String(g.app_id) === String(k));
+          if (matchingGame && matchingGame.status === 'pending') {
+            if (keyIncreases[k] === undefined) keyIncreases[k] = parsed[k];
+          }
         });
       }
     } catch (e) {}
 
-    if (statTotalGamesCount) statTotalGamesCount.textContent = games.length;
-
-    renderTable();
+    updateFilterCounts();
+    setTableFilter(currentTableFilter);
     calculateTotals();
   } catch (err) {
     console.error("Error al cargar datos de la tabla:", err);
   }
 }
 
+function updateFilterCounts() {
+  const countListed = allGamesList.filter(g => g.status === 'listed').length;
+  const countPending = allGamesList.filter(g => g.status === 'pending').length;
+  const countIssue = allGamesList.filter(g => g.status === 'issue').length;
+  const countSold = allGamesList.filter(g => g.status === 'sold' || g.is_sold).length;
+  const countArchived = allGamesList.filter(g => g.status === 'archived' && !g.is_sold && g.status !== 'sold').length;
+  const countDelisted = allGamesList.filter(g => g.is_delisted_steam && g.status !== 'sold' && g.status !== 'archived').length;
+
+  const elListed = document.getElementById('count-table-listed');
+  if (elListed) elListed.textContent = countListed;
+  const elPending = document.getElementById('count-table-pending');
+  if (elPending) elPending.textContent = countPending;
+  const elIssue = document.getElementById('count-table-issue');
+  if (elIssue) elIssue.textContent = countIssue;
+  const elSold = document.getElementById('count-table-sold');
+  if (elSold) elSold.textContent = countSold;
+  const elArchived = document.getElementById('count-table-archived');
+  if (elArchived) elArchived.textContent = countArchived;
+  const elDelisted = document.getElementById('count-table-delisted');
+  if (elDelisted) elDelisted.textContent = countDelisted;
+}
+
+function applyCurrentTableFilter() {
+  if (currentTableFilter === 'listed') {
+    games = allGamesList.filter(g => g.status === 'listed');
+  } else if (currentTableFilter === 'pending') {
+    games = allGamesList.filter(g => g.status === 'pending');
+  } else if (currentTableFilter === 'issue') {
+    games = allGamesList.filter(g => g.status === 'issue');
+  } else if (currentTableFilter === 'sold') {
+    games = allGamesList.filter(g => g.status === 'sold' || g.is_sold);
+  } else if (currentTableFilter === 'archived') {
+    games = allGamesList.filter(g => g.status === 'archived' && !g.is_sold && g.status !== 'sold');
+  } else if (currentTableFilter === 'delisted') {
+    games = allGamesList.filter(g => g.is_delisted_steam && g.status !== 'sold' && g.status !== 'archived');
+  } else {
+    games = allGamesList.filter(g => g.status === 'listed');
+  }
+}
+
+function setTableFilter(filterName) {
+  currentTableFilter = filterName;
+  currentPage = 1;
+
+  const activeStyles = {
+    'listed': ['active', 'bg-blue-600', 'text-white', 'border-blue-500', 'shadow-md', 'shadow-blue-900/30', 'font-bold', 'opacity-100'],
+    'pending': ['active', 'bg-purple-600', 'text-white', 'border-purple-500', 'shadow-md', 'shadow-purple-900/30', 'font-bold', 'opacity-100'],
+    'issue': ['active', 'bg-rose-600', 'text-white', 'border-rose-500', 'shadow-md', 'shadow-rose-900/30', 'font-bold', 'opacity-100'],
+    'sold': ['active', 'bg-emerald-600', 'text-white', 'border-emerald-500', 'shadow-md', 'shadow-emerald-900/30', 'font-bold', 'opacity-100'],
+    'archived': ['active', 'bg-slate-700', 'text-white', 'border-slate-600', 'shadow-md', 'font-bold', 'opacity-100'],
+    'delisted': ['active', 'bg-amber-600', 'text-white', 'border-amber-500', 'shadow-md', 'shadow-amber-900/30', 'font-bold', 'opacity-100']
+  };
+
+  const allStyleClasses = [
+    'active', 'bg-blue-600', 'border-blue-500', 'shadow-blue-900/30',
+    'bg-purple-600', 'border-purple-500', 'shadow-purple-900/30',
+    'bg-rose-600', 'border-rose-500', 'shadow-rose-900/30',
+    'bg-emerald-600', 'border-emerald-500', 'shadow-emerald-900/30',
+    'bg-slate-700', 'border-slate-600',
+    'bg-amber-600', 'border-amber-500', 'shadow-amber-900/30',
+    'text-white', 'shadow-md', 'font-bold', 'opacity-100',
+    'opacity-75', 'bg-slate-950/60', 'hover:bg-slate-800/60', 'text-slate-400', 'border-slate-800/80', 'font-semibold'
+  ];
+
+  const filterNames = ['listed', 'pending', 'issue', 'sold', 'archived', 'delisted'];
+
+  filterNames.forEach(f => {
+    const btn = document.getElementById(`filter-table-${f}`);
+    if (btn) {
+      btn.classList.remove(...allStyleClasses);
+      if (f === filterName) {
+        const classesToAdd = activeStyles[f] || activeStyles['listed'];
+        btn.classList.add(...classesToAdd);
+      } else {
+        btn.classList.add('opacity-75', 'bg-slate-950/60', 'hover:bg-slate-800/60', 'text-slate-400', 'border', 'border-slate-800/80', 'font-semibold');
+      }
+    }
+  });
+
+  applyCurrentTableFilter();
+  renderTable();
+  calculateTotals();
+}
+
 function saveStoredData() {
   try {
     localStorage.setItem('steamtrades_key_increases', JSON.stringify(keyIncreases));
-    localStorage.setItem('steamtrades_reviewed_map', JSON.stringify(reviewedMap));
   } catch (e) {}
 
   // Sincronizar en segundo plano con el backend
   fetch('/api/games/bulk-state', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ increases: keyIncreases, reviewed: reviewedMap })
+    body: JSON.stringify({ increases: keyIncreases, reviewed: {} })
   }).catch(() => {});
 }
 
 function setupEvents() {
   if (searchInput) {
     searchInput.addEventListener('input', () => {
+      currentPage = 1;
       renderTable();
     });
   }
 
-  if (btnIncreaseAll) {
-    btnIncreaseAll.addEventListener('click', () => {
-      games.forEach(g => {
-        const curInc = Number(keyIncreases[g.id] || 0);
-        keyIncreases[g.id] = Number((curInc + 0.25).toFixed(2));
-      });
-      saveStoredData();
-      renderTable();
-      calculateTotals();
-      showToast("+0.25 TF2 añadido a todos los juegos.", "success");
+  // Filtros de estado de la tabla (6 categorías)
+  ['listed', 'pending', 'issue', 'sold', 'archived', 'delisted'].forEach(f => {
+    const btn = document.getElementById(`filter-table-${f}`);
+    if (btn) {
+      btn.addEventListener('click', () => setTableFilter(f));
+    }
+  });
+
+  // Botón General para Consultar Precios de la Página Visible
+  if (btnSyncPrices) {
+    btnSyncPrices.addEventListener('click', async () => {
+      const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+      let list = [...games];
+      if (term) list = list.filter(g => g.name.toLowerCase().includes(term));
+      const startIdx = (currentPage - 1) * PAGE_SIZE;
+      const pageItems = list.slice(startIdx, startIdx + PAGE_SIZE);
+      const idsToSync = pageItems.map(g => g.id);
+
+      if (idsToSync.length === 0) {
+        showToast("No hay juegos visibles para consultar precios.", "info");
+        return;
+      }
+
+      btnSyncPrices.disabled = true;
+      if (btnSyncIcon) btnSyncIcon.classList.add('fa-spin');
+      if (btnSyncText) btnSyncText.textContent = `Consultando (${idsToSync.length})...`;
+
+      try {
+        const res = await fetch('/api/games/sync-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: idsToSync })
+        });
+        const data = await res.json();
+        if (res.ok && data.games) {
+          data.games.forEach(updated => {
+            const idx = allGamesList.findIndex(x => x.id === updated.id);
+            if (idx !== -1) allGamesList[idx] = updated;
+          });
+          applyCurrentTableFilter();
+          renderTable();
+          calculateTotals();
+          showToast(`Precios actualizados para ${data.updated_count} juegos.`, "success");
+        } else {
+          showToast("Error al consultar precios.", "error");
+        }
+      } catch (err) {
+        console.error("Error sincronizando precios:", err);
+        showToast("Error de conexión al consultar precios.", "error");
+      } finally {
+        btnSyncPrices.disabled = false;
+        if (btnSyncIcon) btnSyncIcon.classList.remove('fa-spin');
+        if (btnSyncText) btnSyncText.textContent = "Consultar Precios";
+      }
     });
   }
 
-  if (btnResetAll) {
-    btnResetAll.addEventListener('click', () => {
-      keyIncreases = {};
-      saveStoredData();
-      renderTable();
-      calculateTotals();
-      showToast("Aumentos de contraoferta restablecidos a 0.", "info");
+  // Botón en Modal de Detalle para Consultar Precios de un Juego Individual
+  if (btnModalSyncPrice) {
+    btnModalSyncPrice.addEventListener('click', async () => {
+      if (!selectedGameId) return;
+
+      btnModalSyncPrice.disabled = true;
+      if (modalSyncIcon) modalSyncIcon.classList.add('fa-spin');
+      if (modalSyncText) modalSyncText.textContent = "Consultando...";
+
+      try {
+        const res = await fetch(`/api/games/${selectedGameId}/sync`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.game) {
+          const updated = data.game;
+          const idx = allGamesList.findIndex(x => String(x.id) === String(selectedGameId));
+          if (idx !== -1) allGamesList[idx] = updated;
+
+          applyCurrentTableFilter();
+          renderTable();
+          calculateTotals();
+          openEditModal(selectedGameId);
+          showToast(`Precios de "${updated.name}" actualizados correctamente.`, "success");
+        } else {
+          showToast("Error al consultar precios del juego.", "error");
+        }
+      } catch (err) {
+        console.error("Error sincronizando juego:", err);
+        showToast("Error de conexión al consultar precios.", "error");
+      } finally {
+        btnModalSyncPrice.disabled = false;
+        if (modalSyncIcon) modalSyncIcon.classList.remove('fa-spin');
+        if (modalSyncText) modalSyncText.textContent = "Actualizar Precios";
+      }
+    });
+  }
+
+  // Botones de Paginación
+  if (btnPrevPage) {
+    btnPrevPage.addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderTable();
+      }
+    });
+  }
+
+  if (btnNextPage) {
+    btnNextPage.addEventListener('click', () => {
+      const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+      let list = [...games];
+      if (term) list = list.filter(g => g.name.toLowerCase().includes(term));
+      const totalPages = Math.ceil(list.length / PAGE_SIZE) || 1;
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderTable();
+      }
     });
   }
 
@@ -219,40 +415,154 @@ function setupEvents() {
 
   if (btnExportCsv) btnExportCsv.addEventListener('click', exportToCsv);
 
-  // Modal Añadir Juego
-  if (btnOpenAddModal) {
-    btnOpenAddModal.addEventListener('click', () => {
-      if (inputSteamUrl) inputSteamUrl.value = '';
-      if (inputTf2Keys) inputTf2Keys.value = '1.0';
-      if (inputBuyerName) inputBuyerName.value = '';
-      if (modalAddGame) {
-        modalAddGame.classList.remove('hidden');
-        modalAddGame.classList.add('flex');
-      }
-    });
+  // Listeners Generador Tabla SteamTrades
+  if (btnSteamtradesTable) {
+    btnSteamtradesTable.addEventListener('click', openSteamTradesModal);
+  }
+  if (btnCloseStModal) btnCloseStModal.addEventListener('click', closeSteamTradesModal);
+  if (btnCancelStModal) btnCancelStModal.addEventListener('click', closeSteamTradesModal);
+  if (btnCopyStMarkdown) btnCopyStMarkdown.addEventListener('click', copySteamTradesMarkdown);
+  if (btnDownloadStMarkdown) btnDownloadStMarkdown.addEventListener('click', downloadSteamTradesMarkdown);
+  if (stExportScope) stExportScope.addEventListener('change', refreshSteamTradesMarkdown);
+  if (stExportPriceFormat) stExportPriceFormat.addEventListener('change', refreshSteamTradesMarkdown);
+  if (stExportSpacing) stExportSpacing.addEventListener('change', refreshSteamTradesMarkdown);
+
+  // Variables de autocompletado en modal de añadir
+  const searchSuggestionsDropdown = document.getElementById('search-suggestions-dropdown');
+  const searchSpinner = document.getElementById('search-spinner');
+  const addGamePreviewCard = document.getElementById('add-game-preview-card');
+  const previewImg = document.getElementById('preview-img');
+  const previewName = document.getElementById('preview-name');
+  const previewAppId = document.getElementById('preview-appid');
+  const previewPrice = document.getElementById('preview-price');
+  let searchDebounceTimer = null;
+  let selectedCandidateAppId = null;
+
+  function resetAddModalForm() {
+    if (inputSteamUrl) inputSteamUrl.value = '';
+    if (inputTf2Keys) inputTf2Keys.value = '';
+    if (inputBuyerName) inputBuyerName.value = '';
+    selectedCandidateAppId = null;
+    if (searchSuggestionsDropdown) {
+      searchSuggestionsDropdown.innerHTML = '';
+      searchSuggestionsDropdown.classList.add('hidden');
+    }
+    if (addGamePreviewCard) addGamePreviewCard.classList.add('hidden');
+    if (searchSpinner) searchSpinner.classList.add('hidden');
   }
 
   const closeAddModal = () => {
     if (modalAddGame) {
       modalAddGame.classList.add('hidden');
       modalAddGame.classList.remove('flex');
+      resetAddModalForm();
     }
   };
 
   if (btnCloseAddModal) btnCloseAddModal.addEventListener('click', closeAddModal);
   if (btnCancelAdd) btnCancelAdd.addEventListener('click', closeAddModal);
 
-  if (btnSubmitAdd) {
-    btnSubmitAdd.addEventListener('click', async () => {
-      const steamUrl = inputSteamUrl ? inputSteamUrl.value.trim() : '';
-      const tf2Keys = inputTf2Keys ? parseFloat(inputTf2Keys.value) : 1.0;
-      const buyer = inputBuyerName ? (inputBuyerName.value.trim() || 'xMjalino') : 'xMjalino';
+  // Modal Añadir Juego
+  if (btnOpenAddModal) {
+    btnOpenAddModal.addEventListener('click', () => {
+      resetAddModalForm();
+      if (modalAddGame) {
+        modalAddGame.classList.remove('hidden');
+        modalAddGame.classList.add('flex');
+        if (inputSteamUrl) inputSteamUrl.focus();
+      }
+    });
+  }
 
-      if (!steamUrl) {
-        showToast("Introduce una URL válida de Steam.", "warning");
+  // Búsqueda reactiva por nombre al escribir
+  if (inputSteamUrl) {
+    inputSteamUrl.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      clearTimeout(searchDebounceTimer);
+
+      if (!val || val.length < 2 || val.includes('store.steampowered.com') || /^\d+$/.test(val)) {
+        if (searchSuggestionsDropdown) searchSuggestionsDropdown.classList.add('hidden');
+        if (searchSpinner) searchSpinner.classList.add('hidden');
         return;
       }
 
+      if (searchSpinner) searchSpinner.classList.remove('hidden');
+
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/games/search?query=${encodeURIComponent(val)}`);
+          if (res.ok) {
+            const items = await res.json();
+            renderTableSearchSuggestions(items);
+          }
+        } catch (err) {
+          console.error("Error searching games", err);
+        } finally {
+          if (searchSpinner) searchSpinner.classList.add('hidden');
+        }
+      }, 300);
+    });
+  }
+
+  function renderTableSearchSuggestions(items) {
+    if (!searchSuggestionsDropdown) return;
+    if (!items || items.length === 0) {
+      searchSuggestionsDropdown.innerHTML = `<div class="p-2.5 text-slate-400 text-center">No se encontraron juegos en Steam</div>`;
+      searchSuggestionsDropdown.classList.remove('hidden');
+      return;
+    }
+
+    searchSuggestionsDropdown.innerHTML = items.map(item => `
+      <div class="suggestion-item p-2 hover:bg-slate-800 cursor-pointer flex items-center gap-2.5 transition" 
+           data-appid="${item.app_id}" data-name="${escapeHtml(item.name)}" data-img="${item.header_image || ''}" data-price="${item.price_eur !== null ? item.price_eur.toFixed(2) + ' €' : 'Gratis / N/D'}">
+        <img src="${item.tiny_image || ''}" class="w-12 h-6 object-cover rounded shadow flex-shrink-0" onerror="this.src='${FALLBACK_GAME_SVG}'">
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-slate-200 truncate">${escapeHtml(item.name)}</div>
+          <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+            <span>AppID: ${item.app_id}</span>
+            <span class="text-emerald-400">${item.price_eur !== null ? item.price_eur.toFixed(2) + ' €' : 'Gratis'}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    searchSuggestionsDropdown.classList.remove('hidden');
+
+    searchSuggestionsDropdown.querySelectorAll('.suggestion-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const appid = el.getAttribute('data-appid');
+        const name = el.getAttribute('data-name');
+        const img = el.getAttribute('data-img');
+        const price = el.getAttribute('data-price');
+
+        inputSteamUrl.value = name;
+        selectedCandidateAppId = appid;
+
+        if (addGamePreviewCard) {
+          if (previewImg) previewImg.src = img;
+          if (previewName) previewName.textContent = name;
+          if (previewAppId) previewAppId.textContent = `AppID: ${appid}`;
+          if (previewPrice) previewPrice.textContent = price;
+          addGamePreviewCard.classList.remove('hidden');
+        }
+
+        searchSuggestionsDropdown.classList.add('hidden');
+      });
+    });
+  }
+
+  if (btnSubmitAdd) {
+    btnSubmitAdd.addEventListener('click', async () => {
+      const rawVal = inputSteamUrl ? inputSteamUrl.value.trim() : '';
+      const tf2Keys = inputTf2Keys && inputTf2Keys.value ? parseFloat(inputTf2Keys.value) : 0.0;
+      const buyer = inputBuyerName && inputBuyerName.value.trim() ? inputBuyerName.value.trim() : null;
+
+      if (!rawVal) {
+        showToast("Introduce un nombre o URL válida de Steam.", "warning");
+        return;
+      }
+
+      const payloadQuery = selectedCandidateAppId || rawVal;
       btnSubmitAdd.disabled = true;
       btnSubmitAdd.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo...`;
 
@@ -260,7 +570,7 @@ function setupEvents() {
         const res = await fetch('/api/games/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ steam_url: steamUrl, tf2_keys_offered: tf2Keys, buyer_name: buyer })
+          body: JSON.stringify({ query: payloadQuery, steam_url: payloadQuery, tf2_keys_offered: tf2Keys, buyer_name: buyer })
         });
 
         const data = await res.json();
@@ -280,13 +590,21 @@ function setupEvents() {
     });
   }
 
-  // Modal de Edición de Juego
+  // Modal de Edición de Juego (Estilo Tarjeta)
   if (btnCloseModal) btnCloseModal.addEventListener('click', closeEditModal);
   if (btnCancelModal) btnCancelModal.addEventListener('click', closeEditModal);
   if (editForm) {
     editForm.addEventListener('submit', (e) => {
       e.preventDefault();
       saveModalData();
+    });
+  }
+
+  if (editStatus) {
+    editStatus.addEventListener('change', () => {
+      const st = editStatus.value;
+      updateModalStatusBadge(st);
+      syncStatusPanels(st);
     });
   }
 
@@ -301,24 +619,30 @@ function setupEvents() {
     });
   }
 
-  if (editIsSold) {
-    editIsSold.addEventListener('change', () => {
-      const isChecked = editIsSold.checked;
-      if (soldKeysContainer) {
-        if (isChecked) {
-          soldKeysContainer.classList.remove('hidden');
-          soldKeysContainer.classList.add('flex');
-          if (soldBadge) soldBadge.classList.remove('hidden');
-          // Precargar con contraoferta o oferta original si está vacío
-          if (editSoldPrice && !editSoldPrice.value) {
-            const curGame = games.find(g => String(g.id) === String(selectedGameId));
-            if (curGame) editSoldPrice.value = getEffectiveOffer(curGame);
-          }
+  if (btnDeleteGame) {
+    btnDeleteGame.addEventListener('click', async () => {
+      if (!selectedGameId) return;
+      const game = allGamesList.find(g => String(g.id) === String(selectedGameId)) || games.find(g => String(g.id) === String(selectedGameId));
+      const gameTitle = game ? game.name : `Juego #${selectedGameId}`;
+      if (!confirm(`¿Estás seguro de que deseas eliminar "${gameTitle}" del catálogo?`)) {
+        return;
+      }
+
+      btnDeleteGame.disabled = true;
+      try {
+        const res = await fetch(`/api/games/${selectedGameId}`, { method: 'DELETE' });
+        if (res.ok) {
+          closeEditModal();
+          showToast(`Juego "${gameTitle}" eliminado con éxito.`, "info");
+          await initData();
         } else {
-          soldKeysContainer.classList.add('hidden');
-          soldKeysContainer.classList.remove('flex');
-          if (soldBadge) soldBadge.classList.add('hidden');
+          showToast("Error al eliminar el juego.", "error");
         }
+      } catch (err) {
+        console.error("Error deleting game", err);
+        showToast("Error de conexión al eliminar el juego.", "error");
+      } finally {
+        btnDeleteGame.disabled = false;
       }
     });
   }
@@ -364,6 +688,55 @@ function getImprovementPct(game) {
   return (incTf2 / origTf2) * 100;
 }
 
+function getAskingPriceData(g) {
+  // 1. Si el usuario fijó un precio explícito (counter_price o offer_price fijado en listed)
+  const userPrice = (g.counter_price && Number(g.counter_price) > 0) 
+    ? Number(g.counter_price) 
+    : ((g.offer_price && Number(g.offer_price) > 0 && g.status === 'listed') ? Number(g.offer_price) : null);
+
+  if (userPrice !== null) {
+    const curr = g.counter_currency || g.offer_currency || 'TF2';
+    const isEur = curr === 'EUR';
+    const tf2Val = isEur ? (userPrice / tf2CashPrice) : userPrice;
+    const eurVal = isEur ? userPrice : (userPrice * tf2CashPrice);
+    return {
+      type: 'fixed',
+      value: userPrice,
+      currency: curr,
+      displayTf2: tf2Val,
+      displayEur: eurVal,
+      text: isEur ? `${userPrice.toFixed(2)} €` : `${userPrice.toFixed(2)} TF2`
+    };
+  }
+
+  // 2. Si no, calcular precio orientativo sugerido según suelo de mercado / Kinguin / mínimos
+  const minCur = getMinCurrentPrice(g);
+  const floorEur = (typeof g.floor_price_eur === 'number' && g.floor_price_eur > 0.05) 
+    ? g.floor_price_eur 
+    : ((typeof g.kinguin_price_eur === 'number' && g.kinguin_price_eur > 0.05) 
+      ? g.kinguin_price_eur 
+      : (minCur < 9000 ? minCur : (typeof g.steam_store_price === 'number' ? g.steam_store_price : null)));
+
+  if (floorEur !== null && floorEur > 0.05) {
+    const sugTf2 = (floorEur / tf2CashPrice);
+    return {
+      type: 'suggested',
+      value: sugTf2,
+      currency: 'TF2',
+      displayTf2: sugTf2,
+      displayEur: floorEur,
+      text: `${sugTf2.toFixed(2)} TF2`
+    };
+  }
+
+  return { type: 'none', value: 0, displayTf2: 0, displayEur: 0, text: '-' };
+}
+
+function getAskingPriceValue(g) {
+  const data = getAskingPriceData(g);
+  return data.displayTf2 || 0;
+}
+
 function handleSortTable(field) {
   if (currentTableSort.field === field) {
     currentTableSort.order = currentTableSort.order === 'asc' ? 'desc' : 'asc';
@@ -377,7 +750,7 @@ function handleSortTable(field) {
 }
 
 function updateSortIcons() {
-  const fields = ['id', 'name', 'buyer', 'players', 'min_current', 'floor', 'orig_tf2', 'increase', 'counter_tf2', 'balance', 'improvement', 'reviewed'];
+  const fields = ['id', 'name', 'buyer', 'players', 'min_current', 'kinguin', 'floor', 'asking_price', 'orig_tf2', 'increase', 'counter_tf2', 'balance', 'improvement'];
   fields.forEach(f => {
     const icon = document.getElementById(`sort-icon-${f}`);
     if (!icon) return;
@@ -389,15 +762,168 @@ function updateSortIcons() {
   });
 }
 
-function toggleReviewed(gameId) {
-  reviewedMap[gameId] = !reviewedMap[gameId];
-  saveStoredData();
-  renderTable();
-  calculateTotals();
+function formatGameName(name, maxLen = 40) {
+  if (!name) return '';
+  if (name.length > maxLen) {
+    return name.slice(0, maxLen).trim() + '...';
+  }
+  return name;
+}
+
+function renderTableHeader() {
+  if (!tableHead) return;
+
+  if (currentTableFilter === 'listed') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer" title="Ordenar por ID">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[260px] cursor-pointer" title="Ordenar por Nombre">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer" title="Ordenar por Mínimo Actual">
+          <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('kinguin')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer" title="Precio Kinguin ROW">
+          <span class="inline-flex items-center justify-center gap-1">Kinguin (ROW) <i id="sort-icon-kinguin" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer" title="Ordenar por Suelo Mínimo">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('asking_price')" class="sortable-th py-2 px-3 text-center min-w-[130px] cursor-pointer" title="Ordenar por Precio de Salida / Orientativo">
+          <span class="inline-flex items-center justify-center gap-1 text-amber-300 font-bold">Precio Salida <i id="sort-icon-asking_price" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[90px]">Acciones</th>
+      </tr>
+    `;
+  } else if (currentTableFilter === 'pending') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[200px] cursor-pointer">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Comprador <i id="sort-icon-buyer" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('players')" class="sortable-th py-2 px-3 text-center min-w-[100px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Jugadores (24h) <i id="sort-icon-players" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[110px] border-r border-slate-800 cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('orig_tf2')" class="sortable-th py-2 px-3 text-center min-w-[105px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Oferta Recibida <i id="sort-icon-orig_tf2" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('increase')" class="sortable-th py-2 px-3 text-center min-w-[125px] border-r border-slate-800 cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Aumentar (TF2) <i id="sort-icon-increase" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('counter_tf2')" class="sortable-th py-2 px-3 text-center min-w-[125px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Contraoferta TF2 <i id="sort-icon-counter_tf2" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('balance')" class="sortable-th py-2 px-3 text-center min-w-[115px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Balance vs Suelo <i id="sort-icon-balance" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('improvement')" class="sortable-th py-2 px-3 text-center min-w-[110px] border-r border-slate-800 cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Mejora (% Suelo) <i id="sort-icon-improvement" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[80px]">Acción</th>
+      </tr>
+    `;
+  } else if (currentTableFilter === 'issue') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[240px] cursor-pointer">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 min-w-[220px]">Motivo de Incidencia / Nota</th>
+        <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[90px]">Acciones</th>
+      </tr>
+    `;
+  } else if (currentTableFilter === 'sold') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[240px] cursor-pointer">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Comprador <i id="sort-icon-buyer" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[110px]">Precio Venta</th>
+        <th class="py-2 px-3 min-w-[180px]">Nota / Comentario</th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[80px]">Acciones</th>
+      </tr>
+    `;
+  } else if (currentTableFilter === 'archived') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[240px] cursor-pointer">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Comprador <i id="sort-icon-buyer" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 min-w-[180px]">Nota / Estado</th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[80px]">Acciones</th>
+      </tr>
+    `;
+  } else if (currentTableFilter === 'delisted') {
+    tableHead.innerHTML = `
+      <tr class="text-slate-300 uppercase tracking-wider text-xs border-b border-slate-800 font-bold select-none bg-slate-950/60">
+        <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[260px] cursor-pointer">
+          <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('kinguin')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Kinguin (ROW) <i id="sort-icon-kinguin" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
+          <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
+        </th>
+        <th class="py-2 px-3 text-center min-w-[90px]">Acciones</th>
+      </tr>
+    `;
+  }
+
+  updateSortIcons();
 }
 
 function renderTable() {
   if (!tableBody) return;
+  renderTableHeader();
+
   const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
 
   let list = [...games];
@@ -415,15 +941,19 @@ function renderTable() {
       case 'name':
         return mult * a.name.localeCompare(b.name);
       case 'buyer':
-        return mult * (a.buyer_name || 'xMjalino').localeCompare(b.buyer_name || 'xMjalino');
+        return mult * (a.buyer_name || '').localeCompare(b.buyer_name || '');
       case 'players':
         return mult * ((a.steam_players_24h || 0) - (b.steam_players_24h || 0));
       case 'min_current':
         return mult * (getMinCurrentPrice(a) - getMinCurrentPrice(b));
+      case 'kinguin':
+        return mult * ((a.kinguin_price_eur || 0) - (b.kinguin_price_eur || 0));
       case 'floor':
         return mult * ((a.floor_price_eur || 0) - (b.floor_price_eur || 0));
+      case 'asking_price':
+        return mult * (getAskingPriceValue(a) - getAskingPriceValue(b));
       case 'orig_tf2':
-        return mult * (Number(a.tf2_keys_offered) - Number(b.tf2_keys_offered));
+        return mult * (Number(a.tf2_keys_offered || 0) - Number(b.tf2_keys_offered || 0));
       case 'increase':
         return mult * (getIncrease(a) - getIncrease(b));
       case 'counter_tf2':
@@ -432,8 +962,6 @@ function renderTable() {
         return mult * (getBalancePct(a) - getBalancePct(b));
       case 'improvement':
         return mult * (getImprovementPct(a) - getImprovementPct(b));
-      case 'reviewed':
-        return mult * ((reviewedMap[a.id] ? 1 : 0) - (reviewedMap[b.id] ? 1 : 0));
       case 'id':
       case 'index':
       default:
@@ -441,27 +969,50 @@ function renderTable() {
     }
   });
 
+  // Paginación a 15 registros por página
+  const totalItems = list.length;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIdx = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = list.slice(startIdx, startIdx + PAGE_SIZE);
+
   tableBody.innerHTML = '';
 
-  list.forEach((game, index) => {
+  if (pageItems.length === 0) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.innerHTML = `
+      <td colspan="12" class="py-8 text-center text-slate-400 font-medium">
+        <i class="fa-solid fa-box-open text-2xl mb-2 text-slate-500 block"></i>
+        No se encontraron juegos en esta sección.
+      </td>
+    `;
+    tableBody.appendChild(emptyRow);
+    renderPagination(0);
+    return;
+  }
+
+  let currentPageGameIds = pageItems.map(g => g.id);
+
+  pageItems.forEach((game) => {
     const row = document.createElement('tr');
     row.id = `row-${game.id}`;
-    row.className = "hover:bg-slate-800/50 transition border-b border-slate-800/60";
+    row.className = "hover:bg-slate-800/60 transition border-b border-slate-800/80";
 
-    const origTf2 = Number(game.tf2_keys_offered);
+    const origTf2 = Number(game.tf2_keys_offered || 0);
     const increaseTf2 = getIncrease(game);
     const effectiveTf2 = getEffectiveOffer(game);
     const increaseCash = increaseTf2 * tf2CashPrice;
     const effectiveCash = effectiveTf2 * tf2CashPrice;
-    const isRev = !!reviewedMap[game.id];
-    const isSold = !!game.is_sold;
+    const isSold = !!game.is_sold || game.status === 'sold';
 
     // 1. Jugadores Activos en Steam (24h)
-    let playersHtml = `<span class="text-slate-600 font-mono text-[11px]">--</span>`;
+    let playersHtml = `<span class="text-slate-500 font-mono text-xs">--</span>`;
     if (typeof game.steam_players_24h === 'number') {
       playersHtml = `
-        <span class="text-slate-300 font-mono text-xs font-semibold flex items-center justify-center gap-1">
-          <i class="fa-solid fa-users text-slate-500 text-[10px]"></i>
+        <span class="text-slate-200 font-mono text-xs font-bold flex items-center justify-center gap-1">
+          <i class="fa-solid fa-users text-slate-400 text-[10px]"></i>
           <span>${game.steam_players_24h.toLocaleString()}</span>
         </span>
       `;
@@ -475,209 +1026,325 @@ function renderTable() {
     if (typeof game.steam_store_price === 'number' && game.steam_store_price > 0.05 && !game.is_delisted_steam) curPrices.push(game.steam_store_price);
     
     const minCurrentPriceEur = curPrices.length > 0 ? Math.min(...curPrices) : null;
-    let minCurrentHtml = '--';
+    let minCurrentHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
     if (minCurrentPriceEur !== null) {
       const minCurrentTf2 = (minCurrentPriceEur / tf2CashPrice);
       minCurrentHtml = `
-        <span class="font-bold text-slate-200 text-xs block">${minCurrentTf2.toFixed(2)} TF2</span>
-        <span class="text-[10px] text-slate-400 block">(~${minCurrentPriceEur.toFixed(2)} €)</span>
+        <span class="font-bold text-slate-100 text-xs block font-mono leading-tight">${minCurrentTf2.toFixed(2)} TF2</span>
+        <span class="text-[10px] text-slate-400 block font-mono leading-tight">(~${minCurrentPriceEur.toFixed(2)} €)</span>
       `;
     }
 
-    // 3. Suelo Mínimo (TF2 principal / € secundario)
+    // 3. Kinguin ROW (Solo muestra precio si fue revisado, sino un simple guion)
+    let kinguinHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
+    if (typeof game.kinguin_price_eur === 'number' && game.kinguin_price_eur > 0) {
+      const kinguinTf2 = (game.kinguin_price_eur / tf2CashPrice);
+      const kUrl = game.kinguin_url || `https://www.kinguin.net/listing?active=1&hide_out_of_stock=1&phrase=${encodeURIComponent(game.name)}&platform=Steam&region=Global`;
+      kinguinHtml = `
+        <a href="${kUrl}" target="_blank" class="group inline-block" title="Ver en Kinguin (Clave Global/ROW)">
+          <span class="font-bold text-amber-300 text-xs block group-hover:text-amber-200 transition font-mono leading-tight">${kinguinTf2.toFixed(2)} TF2</span>
+          <span class="text-[10px] text-amber-400/90 block group-hover:text-amber-300 font-mono leading-tight">(~${game.kinguin_price_eur.toFixed(2)} €)</span>
+        </a>
+      `;
+    }
+
+    // 4. Suelo Mínimo
     const floorPriceEur = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : null;
     const floorSource = game.floor_price_source || 'Suelo Mínimo';
-    let floorHtml = '--';
+    let floorHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
     if (floorPriceEur !== null) {
       const floorTf2 = (floorPriceEur / tf2CashPrice);
       floorHtml = `
-        <span class="font-bold text-slate-200 text-xs block">${floorTf2.toFixed(2)} TF2</span>
-        <span class="text-[10px] text-slate-400 block" title="Fuente: ${floorSource}">(~${floorPriceEur.toFixed(2)} €)</span>
+        <span class="font-bold text-slate-100 text-xs block font-mono leading-tight">${floorTf2.toFixed(2)} TF2</span>
+        <span class="text-[10px] text-slate-400 block font-mono leading-tight" title="Fuente: ${floorSource}">(~${floorPriceEur.toFixed(2)} €)</span>
       `;
     }
 
-    // 4. Balance vs Suelo Mínimo (Ganancia / Pérdida respecto a tu oferta final)
-    let balanceHtml = '--';
-    if (floorPriceEur !== null) {
+    // 5. Balance vs Suelo
+    let balanceHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
+    if (floorPriceEur !== null && origTf2 > 0) {
       const balanceEur = effectiveCash - floorPriceEur;
       const balancePct = (balanceEur / floorPriceEur) * 100;
-      
       if (balanceEur >= 0) {
         balanceHtml = `
-          <span class="bg-emerald-950/50 text-emerald-300 border border-emerald-800/40 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+          <span class="bg-emerald-950/70 text-emerald-200 border border-emerald-700/60 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
             +${balancePct.toFixed(1)}%
           </span>
-          <span class="text-[10px] text-emerald-400/80 block mt-0.5 font-medium">+${balanceEur.toFixed(2)}€</span>
+          <span class="text-[10px] text-emerald-400 block mt-0.5 font-bold font-mono">+${balanceEur.toFixed(2)}€</span>
         `;
       } else {
         balanceHtml = `
-          <span class="bg-rose-950/50 text-rose-300 border border-rose-800/40 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+          <span class="bg-rose-950/70 text-rose-200 border border-rose-700/60 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
             ${balancePct.toFixed(1)}%
           </span>
-          <span class="text-[10px] text-rose-300/80 block mt-0.5 font-medium">${balanceEur.toFixed(2)}€</span>
+          <span class="text-[10px] text-rose-300 block mt-0.5 font-bold font-mono">${balanceEur.toFixed(2)}€</span>
         `;
       }
     }
 
-    // 5. Cálculo de Mejora
+    // 6. Mejora
     const origCash = origTf2 * tf2CashPrice;
     const originalLossEur = floorPriceEur !== null ? (floorPriceEur - origCash) : 0;
-    
     let improvementHtml = '';
-    if (increaseTf2 > 0) {
+    if (increaseTf2 > 0 && origTf2 > 0) {
       if (originalLossEur > 0) {
         const pctRecovered = (increaseCash / originalLossEur) * 100;
         improvementHtml = `
-          <span class="text-slate-200 font-bold font-mono text-xs block">+${pctRecovered.toFixed(1)}%</span>
-          <span class="text-[10px] text-slate-400 block">+${increaseCash.toFixed(2)}€ recup.</span>
+          <span class="text-slate-100 font-bold font-mono text-xs block leading-tight">+${pctRecovered.toFixed(1)}%</span>
+          <span class="text-[10px] text-slate-400 block font-mono leading-tight">+${increaseCash.toFixed(2)}€ recup.</span>
         `;
       } else {
         const pctOverOrig = (increaseTf2 / origTf2) * 100;
         improvementHtml = `
-          <span class="text-slate-200 font-bold font-mono text-xs block">+${pctOverOrig.toFixed(1)}%</span>
-          <span class="text-[10px] text-slate-400 block">+${increaseCash.toFixed(2)}€ extra</span>
+          <span class="text-slate-100 font-bold font-mono text-xs block leading-tight">+${pctOverOrig.toFixed(1)}%</span>
+          <span class="text-[10px] text-slate-400 block font-mono leading-tight">+${increaseCash.toFixed(2)}€ extra</span>
         `;
       }
     } else {
-      improvementHtml = `<span class="text-slate-500 text-[11px] font-mono">0.0%</span>`;
+      improvementHtml = `<span class="text-slate-500 text-xs font-mono">-</span>`;
     }
 
-    // Delisted (Coleccionista) y Sold badges
+    // Badges Compactos (Texto en text-[10px])
     const delistedIcon = game.is_delisted_steam 
-      ? `<span class="text-[9px] bg-amber-950/80 text-amber-300 border border-amber-600/70 font-semibold px-1.5 py-0.5 rounded ml-1.5 inline-flex items-center gap-0.5" title="Juego retirado de Steam (Artículo de Coleccionista)"><i class="fa-solid fa-crown text-amber-400"></i> Coleccionista</span>` 
+      ? `<span class="text-[10px] leading-tight bg-amber-950/80 text-amber-300 border border-amber-700/60 font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-sm" title="Juego retirado de Steam (Artículo de Coleccionista)"><i class="fa-solid fa-crown text-[9px] text-amber-400"></i> Coleccionista</span>` 
       : '';
 
-    let soldIconText = '';
-    let soldIconTitle = '';
-    if (isSold) {
+    let soldIcon = '';
+    if (isSold && currentTableFilter !== 'sold') {
       const isEur = game.sold_currency === 'EUR';
       const priceVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || effectiveTf2);
       const formattedPrice = isEur ? `${Number(priceVal).toFixed(2)} €` : `${priceVal} TF2`;
-      const noteSuffix = game.sold_note ? ` - ${escapeHtml(game.sold_note)}` : '';
-      soldIconText = `Vendido (${formattedPrice}${noteSuffix})`;
-      soldIconTitle = `Vendido por ${formattedPrice}${game.sold_note ? ` (${game.sold_note})` : ''}`;
+      soldIcon = `<span class="text-[10px] leading-tight bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-sm" title="Vendido por ${formattedPrice}"><i class="fa-solid fa-check text-[9px] text-emerald-400"></i> Vendido (${formattedPrice})</span>`;
     }
-
-    const soldIcon = isSold
-      ? `<span class="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold px-1.5 py-0.5 rounded ml-1.5 inline-flex items-center gap-0.5" title="${escapeHtml(soldIconTitle)}"><i class="fa-solid fa-check"></i> ${soldIconText}</span>`
-      : '';
-
-    // Botón de Revisado
-    const reviewBtnHtml = isRev ? `
-      <button onclick="toggleReviewed('${game.id}')" class="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-emerald-950/70 hover:bg-emerald-900/70 text-emerald-300 border border-emerald-700/60 transition flex items-center justify-center gap-1 mx-auto shadow-sm">
-        <i class="fa-solid fa-check text-[9px]"></i> Revisado
-      </button>
-    ` : `
-      <button onclick="toggleReviewed('${game.id}')" class="px-2.5 py-1 rounded-lg text-[10px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 transition flex items-center justify-center gap-1 mx-auto">
-        <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> Pendiente
-      </button>
-    `;
 
     const headerImg = game.steam_header_image || FALLBACK_GAME_SVG;
     const safeName = escapeHtml(game.name);
+    const displayName = escapeHtml(formatGameName(game.name, 40));
 
-    // Input protegido si está revisado
-    const inputDisabledAttr = isRev ? 'disabled' : '';
-    const inputClass = isRev 
-      ? 'w-16 bg-slate-950/40 border border-slate-800 text-slate-500 rounded-lg px-1.5 py-1 text-center font-mono text-xs cursor-not-allowed opacity-50' 
-      : `w-16 bg-slate-950 border ${increaseTf2 > 0 ? 'border-slate-500 text-slate-100 font-bold' : 'border-slate-800 text-slate-300'} rounded-lg px-1.5 py-1 text-center font-mono text-xs focus:outline-none focus:border-slate-500 transition`;
+    const bundleBadge = game.bundle
+      ? `<span class="text-[10px] leading-tight bg-slate-950 text-slate-400 border border-slate-800 font-normal px-1.5 py-0.5 rounded inline-flex items-center gap-1 max-w-[200px] truncate" title="Bundle: ${escapeHtml(game.bundle)}"><i class="fa-solid fa-box text-[9px] text-slate-500"></i> ${escapeHtml(game.bundle)}</span>`
+      : '';
 
-    row.innerHTML = `
-      <td class="p-2.5 pl-3 text-center text-slate-400 font-mono text-xs font-semibold" title="ID de Oferta: ${game.id}">${game.id}</td>
-      <td class="p-2.5 font-medium text-slate-100">
-        <div class="flex items-center gap-2.5">
-          <img src="${headerImg}" onclick="openEditModal('${game.id}')" class="w-10 h-5 object-cover rounded-md flex-shrink-0 shadow-sm border border-slate-800 cursor-pointer hover:ring-1 hover:ring-blue-500" onerror="this.onerror=null; this.src='${FALLBACK_GAME_SVG}'" title="Haz clic para editar juego">
-          <div class="truncate">
-            <span onclick="openEditModal('${game.id}')" class="text-xs hover:text-blue-300 transition cursor-pointer font-semibold" title="Haz clic para editar juego">${safeName}</span>
+    const platBadge = (game.platform && game.platform !== 'STEAM')
+      ? `<span class="text-[10px] leading-tight bg-amber-950/80 text-amber-300 border border-amber-700/60 font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-sm" title="Plataforma: ${escapeHtml(game.platform)}"><i class="fa-solid fa-gamepad text-[9px]"></i> ${escapeHtml(game.platform)}</span>`
+      : '';
+
+    const buyerBadge = game.buyer_name ? `
+      <span class="text-xs bg-indigo-950/80 text-indigo-200 border border-indigo-700/60 font-bold px-2 py-0.5 rounded-lg inline-flex items-center gap-1" title="Comprador: ${escapeHtml(game.buyer_name)}">
+        <i class="fa-solid fa-user text-indigo-400 text-[10px]"></i>
+        <span>${escapeHtml(game.buyer_name)}</span>
+      </span>
+    ` : `<span class="text-slate-500 font-mono text-xs">-</span>`;
+
+    const gameCellHtml = `
+      <div class="flex items-center gap-2.5">
+        <img src="${headerImg}" onclick="openEditModal('${game.id}')" class="w-11 h-6 object-cover rounded flex-shrink-0 shadow-sm border border-slate-800 cursor-pointer hover:ring-2 hover:ring-blue-400" onerror="this.onerror=null; this.src='${FALLBACK_GAME_SVG}'" title="Haz clic para ver detalles">
+        <div class="min-w-0 flex-1">
+          <span onclick="openEditModal('${game.id}')" class="text-xs sm:text-sm font-semibold hover:text-blue-300 transition cursor-pointer leading-snug block truncate" title="${safeName}">${displayName}</span>
+          <div class="flex flex-wrap items-center gap-1 mt-0.5">
+            ${platBadge}
+            ${bundleBadge}
             ${delistedIcon}
             ${soldIcon}
           </div>
         </div>
-      </td>
-
-      <!-- Comprador (Columna Dedicada) -->
-      <td class="p-2.5 text-center">
-        <span class="text-[10px] bg-slate-950 text-slate-300 border border-slate-800 font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 shadow-sm" title="Comprador: ${escapeHtml(game.buyer_name || 'Sin comprador')}">
-          <i class="fa-solid fa-user text-[9px] text-indigo-400"></i>
-          <span>${escapeHtml(game.buyer_name || '-')}</span>
-        </span>
-      </td>
-      
-      <!-- Jugadores 24h -->
-      <td class="p-2.5 text-center">${playersHtml}</td>
-
-      <!-- Mínimo Actual (TF2 principal / € secundario) -->
-      <td class="p-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
-      
-      <!-- Suelo Mínimo (TF2 principal / € secundario) -->
-      <td class="p-2.5 text-center font-mono text-xs border-r border-slate-800" title="Fuente: ${floorSource}">${floorHtml}</td>
-      
-      <!-- Oferta Recibida (Solo TF2) -->
-      <td class="p-2.5 text-center text-slate-200 font-mono text-xs">
-        <span class="font-bold">${origTf2} TF2</span>
-      </td>
-
-      <!-- Valor de Contraoferta / Aumentar TF2 (Protegido si está Revisado) -->
-      <td class="p-2.5 text-center border-r border-slate-800">
-        <div class="inline-flex items-center gap-1 justify-center">
-          <span class="text-slate-500 font-bold text-xs">+</span>
-          <input type="number" step="0.25" min="0" 
-                 id="inc-input-${game.id}"
-                 ${inputDisabledAttr}
-                 value="${increaseTf2 > 0 ? increaseTf2 : ''}" 
-                 placeholder="0.00" 
-                 oninput="handleIncreaseInput('${game.id}', this.value)"
-                 class="${inputClass}">
-          <span class="text-[10px] text-slate-500 font-bold">TF2</span>
-        </div>
-      </td>
-
-      <!-- Contraoferta TF2 -->
-      <td id="cell-counter-${game.id}" class="p-2.5 text-center font-mono">
-        <div class="flex flex-col items-center">
-          <span class="font-bold text-slate-100 text-xs">
-            ${effectiveTf2} TF2
-          </span>
-          <span class="text-[10px] text-slate-400 font-medium">
-            ~${effectiveCash.toFixed(2)} € ${increaseTf2 > 0 ? `(+${increaseCash.toFixed(2)}€)` : ''}
-          </span>
-        </div>
-      </td>
-
-      <!-- Balance vs Suelo -->
-      <td id="cell-balance-${game.id}" class="p-2.5 text-center font-mono">
-        ${balanceHtml}
-      </td>
-
-      <!-- Mejora -->
-      <td id="cell-improvement-${game.id}" class="p-2.5 text-center font-mono">
-        ${improvementHtml}
-      </td>
-
-      <!-- Botón de Revisado -->
-      <td class="p-2.5 pr-3 text-center">
-        ${reviewBtnHtml}
-      </td>
+      </div>
     `;
+
+    const actionBtnHtml = `
+      <button onclick="openEditModal('${game.id}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs font-semibold text-slate-200 transition flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-sm" title="Ver detalles">
+        <i class="fa-solid fa-eye text-blue-400 text-[10px]"></i> Detalle
+      </button>
+    `;
+
+    // Renderizar columnas según la sección activa con padding compacto (py-1.5)
+    if (currentTableFilter === 'listed') {
+      const askingData = getAskingPriceData(game);
+      let askingPriceHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
+      if (askingData.type === 'fixed') {
+        askingPriceHtml = `
+          <div class="text-center font-mono cursor-pointer hover:opacity-80 transition" onclick="openEditModal('${game.id}')" title="Precio fijado por ti (${askingData.text}). Haz clic para editar.">
+            <span class="font-bold text-emerald-400 text-xs block leading-tight">${askingData.text}</span>
+            <span class="text-[9px] text-emerald-300/80 block leading-tight font-sans font-semibold">Fijado</span>
+          </div>
+        `;
+      } else if (askingData.type === 'suggested') {
+        askingPriceHtml = `
+          <div class="text-center font-mono cursor-pointer hover:opacity-80 transition" onclick="openEditModal('${game.id}')" title="Precio orientativo sugerido según suelo de mercado / Kinguin (~${askingData.displayEur.toFixed(2)} €). Haz clic para fijar.">
+            <span class="font-bold text-amber-300 text-xs block leading-tight">${askingData.text}</span>
+            <span class="text-[10px] text-slate-400 block leading-tight">(~${askingData.displayEur.toFixed(2)} €)</span>
+            <span class="text-[9px] text-slate-500 block leading-none mt-0.5 font-sans">Orientativo</span>
+          </div>
+        `;
+      }
+
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${kinguinHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${askingPriceHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else if (currentTableFilter === 'pending') {
+      const inputClass = `w-16 bg-slate-950 border ${increaseTf2 > 0 ? 'border-amber-500 text-amber-200 font-bold' : 'border-slate-700 text-slate-200'} rounded-lg px-1.5 py-1 text-center font-mono text-xs focus:outline-none focus:border-blue-500 transition`;
+      const offerReceivedText = origTf2 > 0 ? `${origTf2} TF2` : '-';
+
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${buyerBadge}</td>
+        <td class="py-1.5 px-2.5 text-center">${playersHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs border-r border-slate-800" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center text-amber-300 font-mono text-xs font-bold">${offerReceivedText}</td>
+        <td class="py-1.5 px-2.5 text-center border-r border-slate-800">
+          <div class="inline-flex items-center gap-1 justify-center">
+            <span class="text-slate-400 font-bold text-xs">+</span>
+            <input type="number" step="0.25" min="0" 
+                   id="inc-input-${game.id}"
+                   value="${increaseTf2 > 0 ? increaseTf2 : ''}" 
+                   placeholder="0.00" 
+                   oninput="handleIncreaseInput('${game.id}', this.value)"
+                   class="${inputClass}">
+            <span class="text-[10px] text-slate-400 font-bold font-mono">TF2</span>
+          </div>
+        </td>
+        <td id="cell-counter-${game.id}" class="py-1.5 px-2.5 text-center font-mono">
+          <div class="flex flex-col items-center">
+            <span class="font-bold text-emerald-400 text-xs leading-tight">${effectiveTf2 > 0 ? `${effectiveTf2} TF2` : '-'}</span>
+            <span class="text-[10px] text-slate-400 leading-tight">${effectiveTf2 > 0 ? `~${effectiveCash.toFixed(2)} €` : ''}</span>
+          </div>
+        </td>
+        <td id="cell-balance-${game.id}" class="py-1.5 px-2.5 text-center font-mono">${balanceHtml}</td>
+        <td id="cell-improvement-${game.id}" class="py-1.5 px-2.5 text-center font-mono border-r border-slate-800">${improvementHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else if (currentTableFilter === 'issue') {
+      const issueNoteText = escapeHtml(game.issue_note || 'Agotada / Fuera de stock');
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-rose-300 font-medium text-xs">${issueNoteText}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else if (currentTableFilter === 'sold') {
+      const isEur = game.sold_currency === 'EUR';
+      const priceVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || (isSold ? effectiveTf2 : null));
+      const formattedPrice = priceVal ? (isEur ? `${Number(priceVal).toFixed(2)} €` : `${priceVal} TF2`) : '-';
+
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${buyerBadge}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono font-bold text-emerald-400 text-xs">${formattedPrice}</td>
+        <td class="py-1.5 px-2.5 text-slate-400 text-xs">${escapeHtml(game.sold_note || '-')}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else if (currentTableFilter === 'archived') {
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${buyerBadge}</td>
+        <td class="py-1.5 px-2.5 text-slate-400 text-xs">${escapeHtml(game.sold_note || game.hb_status || 'Archivado')}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else if (currentTableFilter === 'delisted') {
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${kinguinHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    } else {
+      row.innerHTML = `
+        <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
+        <td class="py-1.5 px-2.5 font-medium text-slate-100">${gameCellHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${kinguinHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+      `;
+    }
 
     tableBody.appendChild(row);
   });
+
+  renderPagination(totalItems);
 }
 
-function toggleReviewed(gameId) {
-  const gid = isNaN(Number(gameId)) ? gameId : Number(gameId);
-  const isCurrentlyRev = !!reviewedMap[gid] || !!reviewedMap[gameId];
-  
-  if (isCurrentlyRev) {
-    delete reviewedMap[gid];
-    delete reviewedMap[gameId];
-  } else {
-    reviewedMap[gid] = true;
-    reviewedMap[gameId] = true;
+function renderPagination(totalItems) {
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
+
+  const startIdx = totalItems > 0 ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const endIdx = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+  if (pageStartIdx) pageStartIdx.textContent = startIdx;
+  if (pageEndIdx) pageEndIdx.textContent = endIdx;
+  if (pageTotalCount) pageTotalCount.textContent = totalItems;
+
+  if (btnPrevPage) btnPrevPage.disabled = (currentPage <= 1);
+  if (btnNextPage) btnNextPage.disabled = (currentPage >= totalPages);
+
+  if (!paginationPages) return;
+  paginationPages.innerHTML = '';
+
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, currentPage + 2);
+
+  if (startPage > 1) {
+    const btnFirst = document.createElement('button');
+    btnFirst.className = "w-7 h-7 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer";
+    btnFirst.textContent = "1";
+    btnFirst.onclick = () => goToPage(1);
+    paginationPages.appendChild(btnFirst);
+
+    if (startPage > 2) {
+      const dots = document.createElement('span');
+      dots.className = "text-slate-500 text-xs px-0.5 select-none";
+      dots.textContent = "...";
+      paginationPages.appendChild(dots);
+    }
   }
-  
-  saveStoredData();
-  calculateTotals();
+
+  for (let p = startPage; p <= endPage; p++) {
+    const btn = document.createElement('button');
+    const isActive = (p === currentPage);
+    btn.className = isActive 
+      ? "w-7 h-7 rounded-xl text-xs font-bold bg-blue-600 border border-blue-500 text-white shadow-sm cursor-pointer"
+      : "w-7 h-7 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer";
+    btn.textContent = p;
+    btn.onclick = () => goToPage(p);
+    paginationPages.appendChild(btn);
+  }
+
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      const dots = document.createElement('span');
+      dots.className = "text-slate-500 text-xs px-0.5 select-none";
+      dots.textContent = "...";
+      paginationPages.appendChild(dots);
+    }
+
+    const btnLast = document.createElement('button');
+    btnLast.className = "w-7 h-7 rounded-xl text-xs font-semibold bg-slate-950 border border-slate-700 text-slate-300 hover:bg-slate-800 transition cursor-pointer";
+    btnLast.textContent = totalPages;
+    btnLast.onclick = () => goToPage(totalPages);
+    paginationPages.appendChild(btnLast);
+  }
+}
+
+function goToPage(page) {
+  currentPage = page;
   renderTable();
 }
 
@@ -712,10 +1379,10 @@ function updateRowCells(gameId) {
   if (cellCounter) {
     cellCounter.innerHTML = `
       <div class="flex flex-col items-center">
-        <span class="font-bold text-slate-100 text-xs">
+        <span class="font-black text-emerald-400 text-sm">
           ${effectiveTf2} TF2
         </span>
-        <span class="text-[10px] text-slate-400 font-medium">
+        <span class="text-xs text-slate-300 font-semibold">
           ~${effectiveCash.toFixed(2)} € ${increaseTf2 > 0 ? `(+${increaseCash.toFixed(2)}€)` : ''}
         </span>
       </div>
@@ -729,17 +1396,17 @@ function updateRowCells(gameId) {
     const balancePct = (balanceEur / floorPriceEur) * 100;
     if (balanceEur >= 0) {
       cellBalance.innerHTML = `
-        <span class="bg-emerald-950/50 text-emerald-300 border border-emerald-800/40 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+        <span class="bg-emerald-950/70 text-emerald-200 border border-emerald-700/60 px-2.5 py-1 rounded-lg text-xs font-bold inline-block font-mono">
           +${balancePct.toFixed(1)}%
         </span>
-        <span class="text-[10px] text-emerald-400/80 block mt-0.5 font-medium">+${balanceEur.toFixed(2)}€</span>
+        <span class="text-xs text-emerald-400 block mt-0.5 font-bold font-mono">+${balanceEur.toFixed(2)}€</span>
       `;
     } else {
       cellBalance.innerHTML = `
-        <span class="bg-rose-950/50 text-rose-300 border border-rose-800/40 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+        <span class="bg-rose-950/70 text-rose-200 border border-rose-700/60 px-2.5 py-1 rounded-lg text-xs font-bold inline-block font-mono">
           ${balancePct.toFixed(1)}%
         </span>
-        <span class="text-[10px] text-rose-300/80 block mt-0.5 font-medium">${balanceEur.toFixed(2)}€</span>
+        <span class="text-xs text-rose-300 block mt-0.5 font-bold font-mono">${balanceEur.toFixed(2)}€</span>
       `;
     }
   }
@@ -753,110 +1420,292 @@ function updateRowCells(gameId) {
       if (originalLossEur > 0) {
         const pctRecovered = (increaseCash / originalLossEur) * 100;
         cellImp.innerHTML = `
-          <span class="text-slate-200 font-bold font-mono text-xs block">+${pctRecovered.toFixed(1)}%</span>
-          <span class="text-[10px] text-slate-400 block">+${increaseCash.toFixed(2)}€ recup.</span>
+          <span class="text-slate-100 font-bold font-mono text-xs block">+${pctRecovered.toFixed(1)}%</span>
+          <span class="text-xs text-slate-300 block font-mono">+${increaseCash.toFixed(2)}€ recup.</span>
         `;
       } else {
         const pctOverOrig = (increaseTf2 / origTf2) * 100;
         cellImp.innerHTML = `
-          <span class="text-slate-200 font-bold font-mono text-xs block">+${pctOverOrig.toFixed(1)}%</span>
-          <span class="text-[10px] text-slate-400 block">+${increaseCash.toFixed(2)}€ extra</span>
+          <span class="text-slate-100 font-bold font-mono text-xs block">+${pctOverOrig.toFixed(1)}%</span>
+          <span class="text-xs text-slate-300 block font-mono">+${increaseCash.toFixed(2)}€ extra</span>
         `;
       }
     } else {
-      cellImp.innerHTML = `<span class="text-slate-500 text-[11px] font-mono">0.0%</span>`;
+      cellImp.innerHTML = `<span class="text-slate-500 text-xs font-mono">0.0%</span>`;
     }
   }
 }
 
 function calculateTotals() {
-  let totalOrigKeys = 0;
-  let totalCounterKeys = 0;
-  let reviewedCount = 0;
+  if (!allGamesList || allGamesList.length === 0) return;
 
-  games.forEach(g => {
-    const orig = Number(g.tf2_keys_offered);
-    const inc = getIncrease(g);
-    const effective = orig + inc;
-    
-    totalOrigKeys += orig;
-    totalCounterKeys += effective;
+  const countListed = allGamesList.filter(g => g.status === 'listed').length;
+  const pendingGames = allGamesList.filter(g => g.status === 'pending');
+  const countPending = pendingGames.length;
 
-    if (reviewedMap[g.id]) {
-      reviewedCount++;
+  let pendingKeys = 0;
+  pendingGames.forEach(g => {
+    pendingKeys += Number(g.tf2_keys_offered || g.offer_price || 0);
+  });
+  const pendingCash = pendingKeys * tf2CashPrice;
+
+  const soldGames = allGamesList.filter(g => g.status === 'sold' || g.is_sold);
+  const countSold = soldGames.length;
+  let totalSoldEur = 0;
+  soldGames.forEach(g => {
+    const isEur = g.sold_currency === 'EUR';
+    const priceVal = (g.sold_price !== null && g.sold_price !== undefined) ? Number(g.sold_price) : Number(g.sold_tf2_keys || g.tf2_keys_offered || 0);
+    if (isEur) {
+      totalSoldEur += priceVal;
+    } else {
+      totalSoldEur += (priceVal * tf2CashPrice);
     }
   });
 
-  const origCash = totalOrigKeys * tf2CashPrice;
-  const counterCash = totalCounterKeys * tf2CashPrice;
-  const diffKeys = totalCounterKeys - totalOrigKeys;
-  const diffCash = diffKeys * tf2CashPrice;
+  if (statAvailableGames) statAvailableGames.textContent = countListed;
+  if (statPendingGames) statPendingGames.textContent = countPending;
+  if (statPendingOfferKeys) statPendingOfferKeys.textContent = `${pendingKeys.toFixed(2)} TF2`;
+  if (statPendingOfferCash) statPendingOfferCash.textContent = `(~${pendingCash.toFixed(2)} €)`;
+  if (statSoldCount) statSoldCount.textContent = countSold;
+  if (statSoldTotalCash) statSoldTotalCash.textContent = `(${totalSoldEur.toFixed(2)} €)`;
 
-  if (statOrigKeys) statOrigKeys.textContent = `${totalOrigKeys.toFixed(2)} TF2`;
-  if (statOrigCash) statOrigCash.textContent = `(${origCash.toFixed(2)} €)`;
-  if (statCounterKeys) statCounterKeys.textContent = `${totalCounterKeys.toFixed(2)} TF2`;
-  if (statCounterCash) statCounterCash.textContent = `(${counterCash.toFixed(2)} €)`;
-
-  if (statGainKeys) {
-    statGainKeys.textContent = `${diffKeys >= 0 ? '+' : ''}${diffKeys.toFixed(2)} TF2`;
-  }
-
-  if (statGainCash) {
-    statGainCash.textContent = `(${diffCash >= 0 ? '+' : ''}${diffCash.toFixed(2)} €)`;
-  }
-
-  if (statReviewedCount) statReviewedCount.textContent = reviewedCount;
-  if (statTotalGamesCount) statTotalGamesCount.textContent = games.length;
-  if (statTableTotalCount) statTableTotalCount.textContent = games.length;
+  if (tf2LiveBadgeFooter) tf2LiveBadgeFooter.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+  if (tf2CashBadgeFooter) tf2CashBadgeFooter.textContent = `${tf2CashPrice.toFixed(2)} €`;
 }
 
-// Modal de edición
+function updateModalStatusBadge(status) {
+  const badge = document.getElementById('modal-badge-status');
+  if (!badge) return;
+
+  const statusMap = {
+    'listed': { text: 'Listado (Disponible)', icon: 'fa-solid fa-tag text-slate-300', class: 'bg-slate-800/90 border-slate-600 text-slate-200' },
+    'pending': { text: 'En negociación', icon: 'fa-solid fa-handshake text-purple-400', class: 'bg-purple-950/90 border-purple-700 text-purple-300' },
+    'issue': { text: 'Incidencia', icon: 'fa-solid fa-circle-exclamation text-rose-400', class: 'bg-rose-950/90 border-rose-800 text-rose-300' },
+    'sold': { text: 'Vendido', icon: 'fa-solid fa-check text-emerald-400', class: 'bg-emerald-950/90 border-emerald-600 text-emerald-300' },
+    'archived': { text: 'Archivado / No disponible', icon: 'fa-solid fa-box-archive text-amber-400', class: 'bg-slate-900 border-slate-700 text-slate-400' }
+  };
+
+  const info = statusMap[status] || statusMap['listed'];
+  badge.className = `${info.class} backdrop-blur border text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-md`;
+  badge.innerHTML = `<i class="${info.icon} text-xs"></i> <span>${info.text}</span>`;
+}
+
+function syncStatusPanels(status, game = null) {
+  const soldContainer = document.getElementById('sold-keys-container');
+  const issueContainer = document.getElementById('issue-container');
+
+  if (status === 'sold') {
+    if (soldContainer) {
+      soldContainer.classList.remove('hidden');
+      soldContainer.classList.add('space-y-2.5');
+    }
+    if (issueContainer) issueContainer.classList.add('hidden');
+
+    if (game) {
+      const curCurrency = game.sold_currency || 'TF2';
+      if (editSoldCurrency) editSoldCurrency.value = curCurrency;
+      if (editSoldCurrencyLabel) editSoldCurrencyLabel.textContent = curCurrency === 'EUR' ? '€' : 'TF2';
+      if (editSoldPrice) {
+        editSoldPrice.step = curCurrency === 'EUR' ? '0.01' : '0.25';
+        const initVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || getEffectiveOffer(game));
+        editSoldPrice.value = initVal;
+      }
+      if (editSoldNote) editSoldNote.value = game.sold_note || '';
+    }
+  } else if (status === 'issue') {
+    if (issueContainer) {
+      issueContainer.classList.remove('hidden');
+      issueContainer.classList.add('space-y-2');
+    }
+    if (soldContainer) {
+      soldContainer.classList.add('hidden');
+      soldContainer.classList.remove('space-y-2.5');
+    }
+    if (game && editIssueNote) {
+      editIssueNote.value = game.issue_note || '';
+    }
+  } else {
+    if (soldContainer) {
+      soldContainer.classList.add('hidden');
+      soldContainer.classList.remove('space-y-2.5');
+    }
+    if (issueContainer) {
+      issueContainer.classList.add('hidden');
+      issueContainer.classList.remove('space-y-2');
+    }
+  }
+}
+
+// Modal de edición (Estilo Tarjeta Visual Panorámica)
 function openEditModal(gameId) {
   selectedGameId = gameId;
-  const game = games.find(g => String(g.id) === String(gameId));
+  const game = allGamesList.find(g => String(g.id) === String(gameId)) || games.find(g => String(g.id) === String(gameId));
   if (!game) return;
 
+  // 1. Cabecera visual (Imagen, título, AppID)
   if (modalTitle) modalTitle.textContent = game.name;
   if (modalGameImg) {
     modalGameImg.src = game.steam_header_image || FALLBACK_GAME_SVG;
     modalGameImg.onerror = function() { this.src = FALLBACK_GAME_SVG; };
   }
-  if (modalGameAppId) modalGameAppId.textContent = `AppID: ${game.steam_app_id || 'N/D'}`;
+  if (modalGameAppId) modalGameAppId.textContent = `AppID: ${game.steam_app_id || game.app_id || 'N/D'}`;
 
-  if (editGameId) editGameId.value = game.id;
-  if (editSteamUrl) editSteamUrl.value = game.steam_app_id ? `https://store.steampowered.com/app/${game.steam_app_id}/` : '';
-  if (editTf2Keys) editTf2Keys.value = game.tf2_keys_offered || 0;
-  if (editKeyshopPrice) editKeyshopPrice.value = game.best_keyshop_price_eur || '';
-  if (editOfficialPrice) editOfficialPrice.value = game.ggdeals_current_official || game.steam_store_price || '';
-  if (editHistKeyshop) editHistKeyshop.value = game.ggdeals_historical_keyshop_low || '';
-  if (editHistOfficial) editHistOfficial.value = game.ggdeals_historical_official_low || '';
-  if (editBuyerName) editBuyerName.value = game.buyer_name || 'xMjalino';
-
-  // Estado de vendido
-  const isSold = !!game.is_sold;
-  if (editIsSold) editIsSold.checked = isSold;
-  
-  const curCurrency = game.sold_currency || 'TF2';
-  if (editSoldCurrency) editSoldCurrency.value = curCurrency;
-  if (editSoldCurrencyLabel) editSoldCurrencyLabel.textContent = curCurrency === 'EUR' ? '€' : 'TF2';
-  if (editSoldPrice) {
-    editSoldPrice.step = curCurrency === 'EUR' ? '0.01' : '0.25';
-    const initVal = game.sold_price !== null && game.sold_price !== undefined ? game.sold_price : (game.sold_tf2_keys || (isSold ? getEffectiveOffer(game) : ''));
-    editSoldPrice.value = initVal;
-  }
-  if (editSoldNote) editSoldNote.value = game.sold_note || '';
-  
-  if (soldKeysContainer) {
-    if (isSold) {
-      soldKeysContainer.classList.remove('hidden');
-      soldKeysContainer.classList.add('flex');
-      if (soldBadge) soldBadge.classList.remove('hidden');
+  // 2. Metadatos (Bundle, Jugadores)
+  const modalGameBundle = document.getElementById('modal-game-bundle');
+  const modalBundleText = document.getElementById('modal-bundle-text');
+  if (modalGameBundle && modalBundleText) {
+    if (game.bundle) {
+      modalBundleText.textContent = game.bundle;
+      modalGameBundle.classList.remove('hidden');
     } else {
-      soldKeysContainer.classList.add('hidden');
-      soldKeysContainer.classList.remove('flex');
-      if (soldBadge) soldBadge.classList.add('hidden');
+      modalGameBundle.classList.add('hidden');
     }
   }
+
+  const modalGamePlayers = document.getElementById('modal-game-players');
+  const modalPlayersText = document.getElementById('modal-players-text');
+  if (modalGamePlayers && modalPlayersText) {
+    if (typeof game.steam_players_24h === 'number') {
+      modalPlayersText.textContent = `${game.steam_players_24h.toLocaleString()} jugadores`;
+      modalGamePlayers.classList.remove('hidden');
+    } else {
+      modalPlayersText.textContent = '-- jugadores';
+    }
+  }
+
+  // 3. Badges flotantes en la cabecera
+  const modalBadgePlatform = document.getElementById('modal-badge-platform');
+  const modalPlatformText = document.getElementById('modal-platform-text');
+  if (modalBadgePlatform && modalPlatformText) {
+    if (game.platform && game.platform !== 'STEAM') {
+      modalPlatformText.textContent = game.platform;
+      modalBadgePlatform.classList.remove('hidden');
+      modalBadgePlatform.classList.add('inline-flex');
+    } else {
+      modalBadgePlatform.classList.add('hidden');
+      modalBadgePlatform.classList.remove('inline-flex');
+    }
+  }
+
+  const modalBadgeDelisted = document.getElementById('modal-badge-delisted');
+  if (modalBadgeDelisted) {
+    if (game.is_delisted_steam) {
+      modalBadgeDelisted.classList.remove('hidden');
+      modalBadgeDelisted.classList.add('inline-flex');
+    } else {
+      modalBadgeDelisted.classList.add('hidden');
+      modalBadgeDelisted.classList.remove('inline-flex');
+    }
+  }
+
+  updateModalStatusBadge(game.status || 'listed');
+
+  // 4. Enlaces directos externos
+  const appId = game.steam_app_id || game.app_id;
+  const modalLinkSteam = document.getElementById('modal-link-steam');
+  const modalLinkSteamdb = document.getElementById('modal-link-steamdb');
+  const modalLinkGgdeals = document.getElementById('modal-link-ggdeals');
+
+  if (modalLinkSteam) {
+    modalLinkSteam.href = appId ? `https://store.steampowered.com/app/${appId}/` : `https://store.steampowered.com/search/?term=${encodeURIComponent(game.name)}`;
+  }
+  if (modalLinkSteamdb) {
+    modalLinkSteamdb.href = appId ? `https://steamdb.info/app/${appId}/` : `https://steamdb.info/search/?a=app&q=${encodeURIComponent(game.name)}`;
+  }
+  if (modalLinkGgdeals) {
+    const slug = (game.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    modalLinkGgdeals.href = `https://gg.deals/game/${slug}/`;
+  }
+
+  // 5. Panel de Cotizaciones de Mercado
+  const curOfficialVal = (typeof game.ggdeals_current_official === 'number') ? game.ggdeals_current_official : ((typeof game.steam_store_price === 'number') ? game.steam_store_price : null);
+  const curKeyshopVal = (typeof game.ggdeals_current_keyshop === 'number') ? game.ggdeals_current_keyshop : ((typeof game.best_keyshop_price_eur === 'number') ? game.best_keyshop_price_eur : ((typeof game.kinguin_price_eur === 'number') ? game.kinguin_price_eur : null));
+  
+  const histOfficialVal = (typeof game.ggdeals_historical_official_low === 'number') ? game.ggdeals_historical_official_low : null;
+  const histKeyshopVal = (typeof game.ggdeals_historical_keyshop_low === 'number') ? game.ggdeals_historical_keyshop_low : (curKeyshopVal || null);
+
+  const modalFloorVal = document.getElementById('modal-floor-val');
+  if (modalFloorVal) {
+    if (typeof game.floor_price_eur === 'number' && game.floor_price_eur > 0) {
+      const floorTf2 = (game.floor_price_eur / tf2CashPrice).toFixed(2);
+      modalFloorVal.textContent = `${game.floor_price_eur.toFixed(2)} € (~${floorTf2} TF2)`;
+    } else {
+      modalFloorVal.textContent = '-- €';
+    }
+  }
+
+  const curOfficialEl = document.getElementById('modal-cur-official');
+  if (curOfficialEl) {
+    curOfficialEl.textContent = (curOfficialVal !== null) ? `${curOfficialVal.toFixed(2)} €` : '--';
+  }
+
+  const curKeyshopEl = document.getElementById('modal-cur-keyshop');
+  if (curKeyshopEl) {
+    curKeyshopEl.textContent = (curKeyshopVal !== null) ? `${curKeyshopVal.toFixed(2)} €` : '--';
+  }
+
+  const curDiscountEl = document.getElementById('modal-cur-discount');
+  if (curDiscountEl) {
+    let disc = null;
+    if (game.ggdeals_current_keyshop_discount) {
+      disc = parseInt(game.ggdeals_current_keyshop_discount, 10);
+    } else if (curOfficialVal && curKeyshopVal && curOfficialVal > curKeyshopVal) {
+      disc = Math.round(((curOfficialVal - curKeyshopVal) / curOfficialVal) * 100);
+    }
+    if (disc !== null && !isNaN(disc) && disc > 0) {
+      curDiscountEl.textContent = `-${disc}%`;
+      curDiscountEl.className = "bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-1.5 py-0.5 rounded font-sans font-bold text-xs";
+    } else {
+      curDiscountEl.textContent = '--';
+      curDiscountEl.className = "bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-sans font-bold text-xs";
+    }
+  }
+
+  const histOfficialEl = document.getElementById('modal-hist-official');
+  if (histOfficialEl) {
+    histOfficialEl.textContent = (histOfficialVal !== null) ? `${histOfficialVal.toFixed(2)} €` : '--';
+  }
+
+  const histKeyshopEl = document.getElementById('modal-hist-keyshop');
+  if (histKeyshopEl) {
+    histKeyshopEl.textContent = (histKeyshopVal !== null) ? `${histKeyshopVal.toFixed(2)} €` : '--';
+  }
+
+  const histDiscountEl = document.getElementById('modal-hist-discount');
+  if (histDiscountEl) {
+    let histDisc = null;
+    const baseOfficial = (typeof game.steam_store_price === 'number' && game.steam_store_price > 0) ? game.steam_store_price : (curOfficialVal || histOfficialVal);
+    const lowestHist = (histKeyshopVal !== null && histKeyshopVal > 0) ? histKeyshopVal : histOfficialVal;
+    if (baseOfficial && lowestHist && baseOfficial > lowestHist) {
+      histDisc = Math.round(((baseOfficial - lowestHist) / baseOfficial) * 100);
+    }
+    if (histDisc !== null && !isNaN(histDisc) && histDisc > 0) {
+      histDiscountEl.textContent = `-${histDisc}%`;
+      histDiscountEl.className = "bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 px-1.5 py-0.5 rounded font-sans font-bold text-xs";
+    } else {
+      histDiscountEl.textContent = '--';
+      histDiscountEl.className = "bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-sans font-bold text-xs";
+    }
+  }
+
+  // 6. Campos del Formulario
+  if (editGameId) editGameId.value = game.id;
+  if (editStatus) editStatus.value = game.status || 'listed';
+  if (editTf2Keys) {
+    if (game.status === 'listed') {
+      editTf2Keys.value = (game.offer_price && Number(game.offer_price) > 0) ? game.offer_price : '';
+      const askingData = getAskingPriceData(game);
+      editTf2Keys.placeholder = askingData.type !== 'none' ? askingData.displayTf2.toFixed(2) : '0.00';
+    } else {
+      editTf2Keys.value = game.tf2_keys_offered || 0;
+      editTf2Keys.placeholder = '0.00';
+    }
+  }
+  if (editBuyerName) {
+    editBuyerName.value = (game.status === 'listed' && !game.buyer_name) ? '' : (game.buyer_name || '');
+  }
+
+  syncStatusPanels(game.status || 'listed', game);
 
   if (editModal) {
     editModal.classList.remove('hidden');
@@ -875,23 +1724,35 @@ function closeEditModal() {
 async function saveModalData() {
   if (!selectedGameId) return;
 
-  const isSold = editIsSold ? editIsSold.checked : false;
+  const currentStatus = editStatus ? editStatus.value : 'listed';
+  const isSold = (currentStatus === 'sold');
+  const isIssue = (currentStatus === 'issue');
+
   const soldCurr = editSoldCurrency ? editSoldCurrency.value : 'TF2';
   const soldPriceVal = isSold && editSoldPrice && editSoldPrice.value ? parseFloat(editSoldPrice.value) : null;
   const soldNoteVal = isSold && editSoldNote && editSoldNote.value.trim() ? editSoldNote.value.trim() : null;
-  const buyer = editBuyerName ? (editBuyerName.value.trim() || 'xMjalino') : 'xMjalino';
+  const issueNoteVal = isIssue && editIssueNote && editIssueNote.value.trim() ? editIssueNote.value.trim() : null;
+  const buyer = editBuyerName && editBuyerName.value.trim() ? editBuyerName.value.trim() : null;
+
+  const tf2KeysVal = editTf2Keys && editTf2Keys.value ? (parseFloat(editTf2Keys.value) || 0) : 0;
+
+  if (currentStatus === 'listed') {
+    delete keyIncreases[selectedGameId];
+    saveStoredData();
+  }
 
   const payload = {
-    tf2_keys_offered: parseFloat(editTf2Keys.value) || 0,
-    best_keyshop_price_eur: editKeyshopPrice.value ? parseFloat(editKeyshopPrice.value) : null,
-    ggdeals_current_official: editOfficialPrice.value ? parseFloat(editOfficialPrice.value) : null,
-    ggdeals_historical_keyshop_low: editHistKeyshop.value ? parseFloat(editHistKeyshop.value) : null,
-    ggdeals_historical_official_low: editHistOfficial.value ? parseFloat(editHistOfficial.value) : null,
+    tf2_keys_offered: tf2KeysVal,
+    offer_price: tf2KeysVal,
+    counter_price: currentStatus === 'listed' ? 0.0 : undefined,
+    counter_increase_tf2: currentStatus === 'listed' ? 0.0 : undefined,
+    status: currentStatus,
     is_sold: isSold,
     sold_currency: soldCurr,
     sold_price: soldPriceVal,
     sold_tf2_keys: soldCurr === 'TF2' ? soldPriceVal : null,
     sold_note: soldNoteVal,
+    issue_note: issueNoteVal,
     buyer_name: buyer
   };
 
@@ -933,63 +1794,248 @@ function copyCounterOfferText() {
 }
 
 function exportToCsv() {
-  if (!games || games.length === 0) {
+  const listToExport = (games && games.length > 0) ? games : allGamesList;
+  if (!listToExport || listToExport.length === 0) {
     showToast("No hay juegos en la tabla para exportar.", "warning");
     return;
   }
 
-  // Formateador de números (usamos punto o valor numérico directo compatible)
-  const formatDecimal = (val) => {
-    if (val === null || val === undefined || val === '') return '';
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num)) return '';
-    return num.toString();
-  };
+  try {
+    // Formateador de números (usamos punto decimal estándar)
+    const formatDecimal = (val) => {
+      if (val === null || val === undefined || val === '') return '';
+      const num = typeof val === 'number' ? val : parseFloat(val);
+      if (isNaN(num)) return '';
+      return num.toString();
+    };
 
-  // Cabeceras exactas de la plantilla solicitada
-  let csv = "GameID;Game;Buyer;Offer;CounterOffer;Increment;Revised;Accepted;SoldCurrecy;SoldPrice\r\n";
-  
-  games.forEach(g => {
-    const gameId = g.id;
-    const cleanName = (g.name || '')
-      .replace(/;/g, ' - ')
-      .replace(/"/g, '""')
-      .trim();
-    const cleanBuyer = (g.buyer_name || 'xMjalino')
-      .replace(/;/g, ' - ')
-      .replace(/"/g, '""')
-      .trim();
-
-    const offer = Number(g.tf2_keys_offered || g.offer_price || 0);
-    const increment = getIncrease(g);
-    const counterOffer = offer + increment;
-    const revised = reviewedMap[g.id] ? 1 : 0;
-    const accepted = g.is_sold ? 1 : 0;
-    const soldCurrency = g.sold_currency || 'TF2';
+    // Cabeceras de la plantilla CSV
+    let csv = "GameID;Game;Bundle;Buyer;Offer;CounterOffer;AskingPrice;Increment;Revised;Accepted;SoldCurrency;SoldPrice\r\n";
     
-    let soldPrice = '';
-    if (g.is_sold) {
-      if (g.sold_price !== null && g.sold_price !== undefined) {
-        soldPrice = g.sold_price;
+    listToExport.forEach(g => {
+      const gameId = g.id;
+      const cleanName = (g.name || '')
+        .replace(/;/g, ' - ')
+        .replace(/"/g, '""')
+        .trim();
+      const cleanBundle = (g.bundle || '')
+        .replace(/;/g, ' - ')
+        .replace(/"/g, '""')
+        .trim();
+      const cleanBuyer = (g.buyer_name || '')
+        .replace(/;/g, ' - ')
+        .replace(/"/g, '""')
+        .trim();
+
+      const offer = Number(g.tf2_keys_offered || g.offer_price || 0);
+      const increment = getIncrease(g);
+      const counterOffer = offer + increment;
+      const askData = getAskingPriceData(g);
+      const askingPrice = askData.type !== 'none' ? askData.displayTf2 : '';
+      const revised = g.is_reviewed ? 1 : 0;
+      const accepted = (g.is_sold || g.status === 'sold') ? 1 : 0;
+      const soldCurrency = g.sold_currency || 'TF2';
+      
+      let soldPrice = '';
+      if (accepted === 1) {
+        if (g.sold_price !== null && g.sold_price !== undefined) {
+          soldPrice = g.sold_price;
+        } else {
+          soldPrice = g.sold_tf2_keys || counterOffer;
+        }
+      }
+
+      csv += `"${gameId}";"${cleanName}";"${cleanBundle}";"${cleanBuyer}";${formatDecimal(offer)};${formatDecimal(counterOffer)};${formatDecimal(askingPrice)};${formatDecimal(increment)};${revised};${accepted};"${soldCurrency}";${formatDecimal(soldPrice)}\r\n`;
+    });
+
+    // BOM UTF-8 (\uFEFF) para compatibilidad nativa con Microsoft Excel en español/Windows
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `steamtrades_${currentTableFilter}_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast(`¡Tabla exportada con éxito! (${listToExport.length} juegos)`, "success");
+  } catch (err) {
+    console.error("Error al exportar CSV:", err);
+    showToast("Error al generar el archivo CSV.", "error");
+  }
+}
+
+// ==========================================
+// Generador de Tabla para SteamTrades
+// ==========================================
+function openSteamTradesModal() {
+  if (!modalSteamtradesExport) return;
+  modalSteamtradesExport.classList.remove('hidden');
+  modalSteamtradesExport.classList.add('flex');
+  if (stCopyStatus) stCopyStatus.classList.add('hidden');
+  refreshSteamTradesMarkdown();
+}
+
+function closeSteamTradesModal() {
+  if (!modalSteamtradesExport) return;
+  modalSteamtradesExport.classList.add('hidden');
+  modalSteamtradesExport.classList.remove('flex');
+  if (stCopyStatus) stCopyStatus.classList.add('hidden');
+}
+
+function generateSteamTradesMarkdownContent() {
+  const scope = stExportScope ? stExportScope.value : 'listed_all';
+  const priceFormat = stExportPriceFormat ? stExportPriceFormat.value : 'tf2_eur';
+  const spacing = stExportSpacing ? stExportSpacing.value : 'aligned';
+
+  let listToExport = [];
+  if (scope === 'listed_page') {
+    const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    let list = [...games];
+    if (term) list = list.filter(g => g.name.toLowerCase().includes(term));
+    const startIdx = (currentPage - 1) * PAGE_SIZE;
+    listToExport = list.slice(startIdx, startIdx + PAGE_SIZE);
+  } else if (scope === 'current_view') {
+    listToExport = [...games];
+  } else {
+    // listed_all: todos los juegos listados en catálogo
+    listToExport = allGamesList.filter(g => g.status === 'listed');
+    if (listToExport.length === 0) {
+      listToExport = allGamesList.filter(g => !g.is_sold && g.status !== 'sold');
+    }
+  }
+
+  if (listToExport.length === 0) {
+    return { markdown: "No hay juegos listados para exportar.", count: 0 };
+  }
+
+  // Ordenar alfabéticamente por nombre
+  listToExport.sort((a, b) => a.name.localeCompare(b.name));
+
+  const includePrice = (priceFormat !== 'none');
+  const priceHeader = 'Precio Orientativo / Salida';
+
+  const rowsData = listToExport.map(g => {
+    const gameName = g.name.trim();
+    const bundleName = (g.bundle && g.bundle.trim()) ? g.bundle.trim() : '-';
+    let priceText = '';
+    if (includePrice) {
+      const ask = getAskingPriceData(g);
+      if (ask.type !== 'none') {
+        if (priceFormat === 'tf2_only') {
+          priceText = `${ask.displayTf2.toFixed(2)} TF2`;
+        } else if (priceFormat === 'eur_only') {
+          priceText = `${ask.displayEur.toFixed(2)} €`;
+        } else {
+          priceText = `${ask.displayTf2.toFixed(2)} TF2 (~${ask.displayEur.toFixed(2)} €)`;
+        }
       } else {
-        soldPrice = g.sold_tf2_keys || counterOffer;
+        priceText = 'A convenir';
       }
     }
-
-    csv += `"${gameId}";"${cleanName}";"${cleanBuyer}";${formatDecimal(offer)};${formatDecimal(counterOffer)};${formatDecimal(increment)};${revised};${accepted};"${soldCurrency}";${formatDecimal(soldPrice)}\r\n`;
+    return { game: gameName, bundle: bundleName, price: priceText };
   });
 
-  // BOM UTF-8 (\uFEFF) para compatibilidad nativa con Microsoft Excel en español/Windows
-  const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+  let markdown = '';
+  if (spacing === 'compact') {
+    if (includePrice) {
+      markdown += `| Game | Bundle | ${priceHeader} |\n`;
+      markdown += `|:---|:---|:---|\n`;
+      rowsData.forEach(r => {
+        markdown += `| ${r.game} | ${r.bundle} | ${r.price} |\n`;
+      });
+    } else {
+      markdown += `| Game | Bundle |\n`;
+      markdown += `|:---|:---|\n`;
+      rowsData.forEach(r => {
+        markdown += `| ${r.game} | ${r.bundle} |\n`;
+      });
+    }
+  } else {
+    // Espaciado ancho alineado estilo SteamTrades
+    const maxGame = Math.max(50, ...rowsData.map(r => r.game.length));
+    const maxBundle = Math.max(30, ...rowsData.map(r => r.bundle.length));
+    const maxPrice = includePrice ? Math.max(priceHeader.length, ...rowsData.map(r => r.price.length)) : 0;
+
+    const pad = (str, len) => str + ' '.repeat(Math.max(0, len - str.length));
+
+    if (includePrice) {
+      markdown += `| ${pad('Game', maxGame)} | ${pad('Bundle', maxBundle)} | ${pad(priceHeader, maxPrice)} |\n`;
+      markdown += `|:${'-'.repeat(maxGame + 1)}|:${'-'.repeat(maxBundle + 1)}|:${'-'.repeat(maxPrice + 1)}|\n`;
+      rowsData.forEach(r => {
+        markdown += `| ${pad(r.game, maxGame)} | ${pad(r.bundle, maxBundle)} | ${pad(r.price, maxPrice)} |\n`;
+      });
+    } else {
+      markdown += `| ${pad('Game', maxGame)} | ${pad('Bundle', maxBundle)} |\n`;
+      markdown += `|:${'-'.repeat(maxGame + 1)}|:${'-'.repeat(maxBundle + 1)}|\n`;
+      rowsData.forEach(r => {
+        markdown += `| ${pad(r.game, maxGame)} | ${pad(r.bundle, maxBundle)} |\n`;
+      });
+    }
+  }
+
+  return { markdown, count: rowsData.length };
+}
+
+function refreshSteamTradesMarkdown() {
+  const result = generateSteamTradesMarkdownContent();
+  if (stMarkdownOutput) stMarkdownOutput.value = result.markdown;
+  if (stPreviewCount) stPreviewCount.textContent = result.count;
+}
+
+function copySteamTradesMarkdown() {
+  if (!stMarkdownOutput) return;
+  const text = stMarkdownOutput.value;
+  if (!text) return;
+
+  const showSuccessFeedback = () => {
+    if (stCopyStatus) {
+      stCopyStatus.classList.remove('hidden');
+      setTimeout(() => { if (stCopyStatus) stCopyStatus.classList.add('hidden'); }, 3000);
+    }
+    if (btnCopyStMarkdown) {
+      const origHtml = btnCopyStMarkdown.innerHTML;
+      btnCopyStMarkdown.innerHTML = `<i class="fa-solid fa-check text-white"></i> ¡Copiado!`;
+      btnCopyStMarkdown.classList.replace('bg-amber-600', 'bg-emerald-600');
+      btnCopyStMarkdown.classList.replace('hover:bg-amber-500', 'hover:bg-emerald-500');
+      setTimeout(() => {
+        if (btnCopyStMarkdown) {
+          btnCopyStMarkdown.innerHTML = origHtml;
+          btnCopyStMarkdown.classList.replace('bg-emerald-600', 'bg-amber-600');
+          btnCopyStMarkdown.classList.replace('hover:bg-emerald-500', 'hover:bg-amber-500');
+        }
+      }, 2000);
+    }
+    showToast("¡Tabla copiada al portapapeles para SteamTrades!", "success");
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showSuccessFeedback).catch(() => {
+      stMarkdownOutput.select();
+      document.execCommand('copy');
+      showSuccessFeedback();
+    });
+  } else {
+    stMarkdownOutput.select();
+    document.execCommand('copy');
+    showSuccessFeedback();
+  }
+}
+
+function downloadSteamTradesMarkdown() {
+  if (!stMarkdownOutput) return;
+  const text = stMarkdownOutput.value;
+  if (!text) return;
+
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.setAttribute('href', url);
-  link.setAttribute('download', `steamtrades_table_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute('download', `steamtrades_catalogo_${new Date().toISOString().slice(0, 10)}.txt`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
-  showToast(`¡Tabla exportada con éxito! (${games.length} juegos)`, "success");
+  showToast("¡Archivo de tabla para SteamTrades descargado!", "success");
 }
 
 function parseCsvLine(text) {
@@ -1118,7 +2164,7 @@ async function handleCsvFileSelect(e) {
             badgeHtml = `<span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-semibold text-[10px]">Vendido: ${pVal} ${escapeHtml(r.sold_currency || 'TF2')}</span>`;
           } else if (r.revised === true) {
             const inc = r.increment !== null ? r.increment : 0;
-            badgeHtml = `<span class="px-2 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-700/60 font-semibold text-[10px]">Tramitado (+${inc} TF2)</span>`;
+            badgeHtml = `<span class="px-2 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-700/60 font-semibold text-[10px]">En negociación (+${inc} TF2)</span>`;
           } else {
             badgeHtml = `<span class="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-700 font-semibold text-[10px]">Listado</span>`;
           }
@@ -1128,7 +2174,7 @@ async function handleCsvFileSelect(e) {
               <div class="flex items-center gap-2 truncate min-w-0">
                 <span class="text-slate-500 font-mono font-bold text-[10px]">#${r.game_id}</span>
                 <span class="text-slate-200 font-sans truncate font-medium text-xs">${escapeHtml(r.game_name || 'Juego')}</span>
-                <span class="text-slate-500 text-[10px]">(${escapeHtml(r.buyer || 'xMjalino')})</span>
+                ${r.buyer ? `<span class="text-slate-500 text-[10px]">(${escapeHtml(r.buyer)})</span>` : ''}
               </div>
               <div class="flex-shrink-0">
                 ${badgeHtml}

@@ -6,6 +6,8 @@ from backend.app.db.session import engine, Base, SessionLocal
 from backend.app.models.game import Game
 from backend.app.models.offer import Offer
 from backend.app.models.settings import MarketSettingsModel
+from backend.app.models.market_price import MarketPrice
+from backend.app.services.kinguin_service import generate_kinguin_search_url
 
 def init_database():
     """Crea las tablas SQLite e inicializa los datos si la base de datos está vacía."""
@@ -75,6 +77,29 @@ def init_database():
                             best_keyshop_name=g.get("best_keyshop_name")
                         )
                         db.add(game_obj)
+                        
+                    # Comprobar o crear registro en market_prices
+                    mp_obj = db.query(MarketPrice).filter(MarketPrice.app_id == app_id).first()
+                    if not mp_obj:
+                        k_url = g.get("links", {}).get("kinguin") if isinstance(g.get("links"), dict) else None
+                        if not k_url:
+                            k_url = generate_kinguin_search_url(g["name"])
+                        mp_obj = MarketPrice(
+                            app_id=app_id,
+                            kinguin_price_eur=None,
+                            kinguin_url=k_url,
+                            kinguin_in_stock=True,
+                            ggdeals_official_current=g.get("ggdeals_current_official"),
+                            ggdeals_keyshop_current=g.get("ggdeals_current_keyshop") or g.get("best_keyshop_price_eur"),
+                            best_keyshop_name=g.get("best_keyshop_name"),
+                            ggdeals_keyshop_discount=g.get("ggdeals_current_keyshop_discount"),
+                            ggdeals_official_hist_low=g.get("ggdeals_historical_official_low"),
+                            ggdeals_official_hist_time=g.get("ggdeals_historical_official_time"),
+                            ggdeals_keyshop_hist_low=g.get("ggdeals_historical_keyshop_low"),
+                            ggdeals_keyshop_hist_time=g.get("ggdeals_historical_keyshop_time"),
+                            ggdeals_url=g.get("links", {}).get("ggdeals") if isinstance(g.get("links"), dict) else None
+                        )
+                        db.add(mp_obj)
                     
                     status_val = g.get("status") or ("sold" if g.get("is_sold") else "pending")
                     offer_obj = Offer(
@@ -95,8 +120,34 @@ def init_database():
                     
                 db.commit()
                 print(f"Base de datos SQLite inicializada y migrada con éxito: {len(game_list)} ofertas.")
+                
+        # 3. Asegurar que todos los juegos existentes tengan su registro en market_prices
+        all_games = db.query(Game).all()
+        created_mps = 0
+        for g in all_games:
+            if not g.market_price:
+                mp = MarketPrice(
+                    app_id=g.app_id,
+                    kinguin_price_eur=None,
+                    kinguin_url=generate_kinguin_search_url(g.name),
+                    kinguin_in_stock=True,
+                    ggdeals_official_current=g.ggdeals_official_current,
+                    ggdeals_keyshop_current=g.ggdeals_keyshop_current,
+                    best_keyshop_name=g.best_keyshop_name,
+                    ggdeals_keyshop_discount=g.ggdeals_keyshop_discount,
+                    ggdeals_official_hist_low=g.ggdeals_official_hist_low,
+                    ggdeals_official_hist_time=g.ggdeals_official_hist_time,
+                    ggdeals_keyshop_hist_low=g.ggdeals_keyshop_hist_low,
+                    ggdeals_keyshop_hist_time=g.ggdeals_keyshop_hist_time
+                )
+                db.add(mp)
+                created_mps += 1
+        if created_mps > 0:
+            db.commit()
+            print(f"Migrados {created_mps} registros a market_prices.")
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     init_database()

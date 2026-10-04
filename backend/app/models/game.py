@@ -5,12 +5,16 @@ from backend.app.db.session import Base
 class Game(Base):
     __tablename__ = "games"
 
-    # Steam AppID único como clave primaria
+    # Steam AppID y Bundle como clave primaria compuesta
     app_id = Column(Integer, primary_key=True, index=True)
+    bundle = Column(String(255), primary_key=True, default="", index=True)
     name = Column(String, nullable=False, index=True)
     header_image = Column(String, nullable=True)
     is_delisted = Column(Boolean, default=False)
     delisted_reason = Column(String, nullable=True)
+    platform = Column(String(50), default="STEAM", nullable=False, index=True)
+    hb_status = Column(String(100), nullable=True)
+    key_url = Column(String(500), nullable=True)
     
     # Precios de Steam y jugadores activos
     steam_price = Column(Float, nullable=True)
@@ -27,10 +31,23 @@ class Game(Base):
     best_keyshop_name = Column(String, nullable=True)
     last_synced_at = Column(DateTime, nullable=True)
 
-    # Relación con sus ofertas / claves
+    # Relaciones
     offers = relationship("Offer", back_populates="game", cascade="all, delete-orphan")
+    market_price = relationship("MarketPrice", back_populates="game", uselist=False, cascade="all, delete-orphan")
 
     # Alias / Propiedades para facilitar compatibilidad
+    @property
+    def kinguin_price_eur(self):
+        return self.market_price.kinguin_price_eur if self.market_price else None
+
+    @property
+    def kinguin_url(self):
+        return self.market_price.kinguin_url if self.market_price else None
+
+    @property
+    def kinguin_in_stock(self):
+        return self.market_price.kinguin_in_stock if self.market_price else True
+
     @property
     def id(self):
         return self.app_id

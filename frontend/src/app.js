@@ -209,56 +209,156 @@ function setupEventListeners() {
     });
   }
 
-  // Modal Añadir Juego
-  if (btnOpenAddModal) {
-    btnOpenAddModal.addEventListener('click', () => {
-      if (modalAddGame) {
-        modalAddGame.classList.remove('hidden');
-        modalAddGame.classList.add('flex');
-        if (inputSteamUrl) {
-          inputSteamUrl.value = '';
-          inputSteamUrl.focus();
-        }
-        if (inputTf2Keys) inputTf2Keys.value = '1.0';
-        if (inputBuyerName) {
-          inputBuyerName.value = '';
-          inputBuyerName.placeholder = 'Comprador (opcional)';
-        }
-      }
-    });
+  // Variables de autocompletado en modal de añadir
+  const searchSuggestionsDropdown = document.getElementById('search-suggestions-dropdown');
+  const searchSpinner = document.getElementById('search-spinner');
+  const addGamePreviewCard = document.getElementById('add-game-preview-card');
+  const previewImg = document.getElementById('preview-img');
+  const previewName = document.getElementById('preview-name');
+  const previewAppId = document.getElementById('preview-appid');
+  const previewPrice = document.getElementById('preview-price');
+  let searchDebounceTimer = null;
+  let selectedCandidateAppId = null;
+
+  function resetAddModalForm() {
+    if (inputSteamUrl) inputSteamUrl.value = '';
+    if (inputTf2Keys) inputTf2Keys.value = '1.0';
+    if (inputBuyerName) {
+      inputBuyerName.value = '';
+      inputBuyerName.placeholder = 'Comprador (opcional)';
+    }
+    selectedCandidateAppId = null;
+    if (searchSuggestionsDropdown) {
+      searchSuggestionsDropdown.innerHTML = '';
+      searchSuggestionsDropdown.classList.add('hidden');
+    }
+    if (addGamePreviewCard) addGamePreviewCard.classList.add('hidden');
+    if (searchSpinner) searchSpinner.classList.add('hidden');
   }
 
   function closeAddModal() {
     if (modalAddGame) {
       modalAddGame.classList.add('hidden');
       modalAddGame.classList.remove('flex');
+      resetAddModalForm();
     }
   }
 
   if (btnCloseAddModal) btnCloseAddModal.addEventListener('click', closeAddModal);
   if (btnCancelAdd) btnCancelAdd.addEventListener('click', closeAddModal);
 
+  // Búsqueda reactiva por nombre al escribir
+  if (inputSteamUrl) {
+    inputSteamUrl.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      clearTimeout(searchDebounceTimer);
+
+      if (!val || val.length < 2 || val.includes('store.steampowered.com') || /^\d+$/.test(val)) {
+        if (searchSuggestionsDropdown) searchSuggestionsDropdown.classList.add('hidden');
+        if (searchSpinner) searchSpinner.classList.add('hidden');
+        return;
+      }
+
+      if (searchSpinner) searchSpinner.classList.remove('hidden');
+
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/games/search?query=${encodeURIComponent(val)}`);
+          if (res.ok) {
+            const items = await res.json();
+            renderSearchSuggestions(items);
+          }
+        } catch (err) {
+          console.error("Error searching games", err);
+        } finally {
+          if (searchSpinner) searchSpinner.classList.add('hidden');
+        }
+      }, 300);
+    });
+  }
+
+  function renderSearchSuggestions(items) {
+    if (!searchSuggestionsDropdown) return;
+    if (!items || items.length === 0) {
+      searchSuggestionsDropdown.innerHTML = `<div class="p-2.5 text-slate-400 text-center">No se encontraron juegos en Steam</div>`;
+      searchSuggestionsDropdown.classList.remove('hidden');
+      return;
+    }
+
+    searchSuggestionsDropdown.innerHTML = items.map(item => `
+      <div class="suggestion-item p-2 hover:bg-slate-800 cursor-pointer flex items-center gap-2.5 transition" 
+           data-appid="${item.app_id}" data-name="${escapeHtml(item.name)}" data-img="${item.header_image || ''}" data-price="${item.price_eur !== null ? item.price_eur.toFixed(2) + ' €' : 'Gratis / N/D'}">
+        <img src="${item.tiny_image || ''}" class="w-12 h-6 object-cover rounded shadow flex-shrink-0" onerror="this.src='${FALLBACK_GAME_SVG}'">
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-slate-200 truncate">${escapeHtml(item.name)}</div>
+          <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+            <span>AppID: ${item.app_id}</span>
+            <span class="text-emerald-400">${item.price_eur !== null ? item.price_eur.toFixed(2) + ' €' : 'Gratis'}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    searchSuggestionsDropdown.classList.remove('hidden');
+
+    searchSuggestionsDropdown.querySelectorAll('.suggestion-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const appid = el.getAttribute('data-appid');
+        const name = el.getAttribute('data-name');
+        const img = el.getAttribute('data-img');
+        const price = el.getAttribute('data-price');
+
+        inputSteamUrl.value = name;
+        selectedCandidateAppId = appid;
+
+        if (addGamePreviewCard) {
+          if (previewImg) previewImg.src = img;
+          if (previewName) previewName.textContent = name;
+          if (previewAppId) previewAppId.textContent = `AppID: ${appid}`;
+          if (previewPrice) previewPrice.textContent = price;
+          addGamePreviewCard.classList.remove('hidden');
+        }
+
+        searchSuggestionsDropdown.classList.add('hidden');
+      });
+    });
+  }
+
+  // Modal Añadir Juego
+  if (btnOpenAddModal) {
+    btnOpenAddModal.addEventListener('click', () => {
+      if (modalAddGame) {
+        modalAddGame.classList.remove('hidden');
+        modalAddGame.classList.add('flex');
+        resetAddModalForm();
+        if (inputSteamUrl) inputSteamUrl.focus();
+      }
+    });
+  }
+
   if (btnSubmitAdd) {
     btnSubmitAdd.addEventListener('click', async () => {
-      const url = inputSteamUrl ? inputSteamUrl.value.trim() : '';
+      const rawVal = inputSteamUrl ? inputSteamUrl.value.trim() : '';
       const keys = inputTf2Keys && inputTf2Keys.value ? parseFloat(inputTf2Keys.value) : 1.0;
       const buyer = inputBuyerName && inputBuyerName.value.trim() ? inputBuyerName.value.trim() : null;
-      if (!url) return;
+      if (!rawVal) return;
 
+      const payloadQuery = selectedCandidateAppId || rawVal;
       btnSubmitAdd.disabled = true;
       btnSubmitAdd.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Añadiendo...`;
       try {
         const res = await fetch('/api/games/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ steam_url: url, tf2_keys_offered: keys, offer_price: keys, buyer_name: buyer })
+          body: JSON.stringify({ query: payloadQuery, steam_url: payloadQuery, tf2_keys_offered: keys, offer_price: keys, buyer_name: buyer })
         });
         if (res.ok) {
           closeAddModal();
           await loadSummary();
           await loadGames();
         } else {
-          alert("Error al añadir el juego. Verifica la URL de Steam.");
+          const errData = await res.json().catch(() => ({}));
+          alert(errData.detail || "Error al añadir el juego. Verifica el nombre o enlace.");
         }
       } catch (err) {
         console.error("Error adding game", err);
@@ -269,6 +369,7 @@ function setupEventListeners() {
       }
     });
   }
+
 }
 
 function updateModalStatusUI(statusVal) {
@@ -485,39 +586,39 @@ function renderGamesGrid() {
       if (lossEur > 0) {
         const lossPct = (lossEur / floorPrice) * 100;
         lossBadgeHtml = `
-          <div class="bg-slate-950 border border-slate-800 p-2 rounded-lg text-xs space-y-0.5">
-            <div class="flex justify-between items-center font-bold text-[10px]">
-              <span class="flex items-center gap-1 text-rose-300" title="Suelo de mercado: ${floorPrice.toFixed(2)}€ (${floorSource})">
-                <i class="fa-solid fa-arrow-trend-down text-rose-400"></i> Dejas de ganar:
+          <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs space-y-1">
+            <div class="flex justify-between items-center font-bold text-xs">
+              <span class="flex items-center gap-1.5 text-rose-300" title="Suelo de mercado: ${floorPrice.toFixed(2)}€ (${floorSource})">
+                <i class="fa-solid fa-arrow-trend-down text-rose-400 text-sm"></i> Dejas de ganar:
               </span>
-              <span class="text-[11px] font-black text-rose-400 font-mono">+${lossEur.toFixed(2)} € (${lossPct.toFixed(1)}%)</span>
+              <span class="text-xs font-black text-rose-400 font-mono">+${lossEur.toFixed(2)} € (${lossPct.toFixed(1)}%)</span>
             </div>
-            <div class="text-[9px] text-right text-slate-400 flex justify-between font-mono">
+            <div class="text-[11px] text-right text-slate-300 flex justify-between font-mono">
               <span>Suelo: ${floorPrice.toFixed(2)}€</span>
-              <span class="italic text-[8px] truncate max-w-[120px] font-sans">${floorSource}</span>
+              <span class="italic text-[10px] truncate max-w-[140px] font-sans text-slate-400">${floorSource}</span>
             </div>
           </div>
         `;
       } else {
         const gainEur = Math.abs(lossEur);
         lossBadgeHtml = `
-          <div class="bg-emerald-950/60 border border-emerald-800/50 p-2 rounded-lg text-xs space-y-0.5 text-emerald-300">
-            <div class="flex justify-between items-center font-bold text-[10px]">
-              <span class="flex items-center gap-1">
-                <i class="fa-solid fa-check-circle text-emerald-400"></i> Trato favorable:
+          <div class="bg-emerald-950/60 border border-emerald-800/50 p-2.5 rounded-xl text-xs space-y-1 text-emerald-300">
+            <div class="flex justify-between items-center font-bold text-xs">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-check-circle text-emerald-400 text-sm"></i> Trato favorable:
               </span>
-              <span class="text-[11px] font-black text-emerald-300 font-mono">+${gainEur.toFixed(2)} € sobre suelo</span>
+              <span class="text-xs font-black text-emerald-300 font-mono">+${gainEur.toFixed(2)} € sobre suelo</span>
             </div>
-            <div class="text-[9px] text-right text-emerald-400/80 flex justify-between font-mono">
+            <div class="text-[11px] text-right text-emerald-400/90 flex justify-between font-mono">
               <span>Suelo: ${floorPrice.toFixed(2)}€</span>
-              <span class="font-semibold text-[8px] font-sans">¡Pagan por encima del suelo!</span>
+              <span class="font-semibold text-[10px] font-sans">¡Pagan por encima del suelo!</span>
             </div>
           </div>
         `;
       }
     } else {
       lossBadgeHtml = `
-        <div class="bg-slate-950 border border-slate-800 p-2 rounded-lg text-[10px] text-slate-500 text-center">
+        <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl text-xs text-slate-400 text-center font-medium">
           Cotización de suelo pendiente
         </div>
       `;
@@ -527,33 +628,33 @@ function renderGamesGrid() {
     let statusBadgeHtml = '';
     if (effStatus === 'listed') {
       statusBadgeHtml = `
-        <span class="bg-slate-800/90 border border-slate-600 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Publicado en SteamTrades sin oferta">
-          <i class="fa-solid fa-tag text-[8px] text-slate-400"></i> Listado
+        <span class="bg-slate-800/90 border border-slate-600 text-slate-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" title="Publicado en SteamTrades sin oferta">
+          <i class="fa-solid fa-tag text-[10px] text-slate-400"></i> Listado
         </span>
       `;
     } else if (effStatus === 'pending') {
       statusBadgeHtml = `
-        <span class="bg-purple-950/90 border border-purple-600/80 text-purple-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Oferta recibida / En revisión / Esperando respuesta">
-          <i class="fa-solid fa-clock text-[8px] text-purple-400"></i> Tramitado
+        <span class="bg-purple-950/90 border border-purple-600/80 text-purple-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" title="Oferta recibida / En revisión / Esperando respuesta">
+          <i class="fa-solid fa-clock text-[10px] text-purple-400"></i> Tramitado
         </span>
       `;
     } else if (effStatus === 'sold') {
       statusBadgeHtml = `
-        <span class="bg-emerald-950/90 border border-emerald-600/80 text-emerald-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Trato cerrado y cobrado">
-          <i class="fa-solid fa-check text-[8px] text-emerald-400"></i> Vendido
+        <span class="bg-emerald-950/90 border border-emerald-600/80 text-emerald-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" title="Trato cerrado y cobrado">
+          <i class="fa-solid fa-check text-[10px] text-emerald-400"></i> Vendido
         </span>
       `;
     } else if (effStatus === 'issue') {
       statusBadgeHtml = `
-        <span class="bg-rose-950/90 border border-rose-600/80 text-rose-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="Incidencia registrada: ${escapeHtml(game.issue_note || '')}">
-          <i class="fa-solid fa-circle-exclamation text-[8px] text-rose-400"></i> Incidencia
+        <span class="bg-rose-950/90 border border-rose-600/80 text-rose-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" title="Incidencia registrada: ${escapeHtml(game.issue_note || '')}">
+          <i class="fa-solid fa-circle-exclamation text-[10px] text-rose-400"></i> Incidencia
         </span>
       `;
     }
 
     const delistedBadge = game.is_delisted_steam ? `
-      <span class="bg-amber-950/80 border border-amber-600/70 text-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm" title="${game.delisted_reason || 'Juego retirado de la tienda oficial de Steam (Artículo de Coleccionista)'}">
-        <i class="fa-solid fa-crown text-amber-400 text-[8px]"></i> Coleccionista
+      <span class="bg-amber-950/80 border border-amber-600/70 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-sm" title="${game.delisted_reason || 'Juego retirado de la tienda oficial de Steam (Artículo de Coleccionista)'}">
+        <i class="fa-solid fa-crown text-amber-400 text-[10px]"></i> Coleccionista
       </span>
     ` : '';
 
@@ -602,12 +703,12 @@ function renderGamesGrid() {
         <!-- Panel de Incidencia Registrada -->
         <div class="bg-rose-950/30 border border-rose-800/70 rounded-xl p-2.5 flex-1 flex flex-col justify-center space-y-1.5 shadow-sm">
           <div class="flex items-center justify-between border-b border-rose-900/60 pb-1">
-            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-              <i class="fa-solid fa-circle-exclamation text-rose-400 text-xs"></i> Incidencia / Problema
+            <span class="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-exclamation text-rose-400 text-sm"></i> Incidencia / Problema
             </span>
-            <span class="text-[9px] bg-rose-950 text-rose-300 border border-rose-700/80 px-1.5 py-0.5 rounded font-bold font-mono">Bloqueada</span>
+            <span class="text-xs bg-rose-950 text-rose-200 border border-rose-700/80 px-2 py-0.5 rounded font-bold font-mono">Bloqueada</span>
           </div>
-          <p class="text-[11px] text-rose-200/90 font-medium line-clamp-3 italic pt-0.5" title="${issueDesc}">
+          <p class="text-xs text-rose-100 font-semibold line-clamp-3 italic pt-0.5" title="${issueDesc}">
             "${issueDesc}"
           </p>
         </div>
@@ -654,30 +755,30 @@ function renderGamesGrid() {
           <!-- Cabecera de Venta -->
           <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
             <div>
-              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Precio de Venta</span>
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Precio de Venta</span>
               <div class="flex items-center gap-1.5 mt-0.5">
-                <span class="text-base font-black text-emerald-400 font-mono">${priceDisplay}</span>
-                ${noteText ? `<span class="bg-slate-900 border border-slate-700 text-slate-300 text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1" title="Nota: ${noteText}"><i class="fa-solid fa-receipt text-[9px] text-emerald-400"></i> ${noteText}</span>` : ''}
+                <span class="text-lg font-black text-emerald-400 font-mono">${priceDisplay}</span>
+                ${noteText ? `<span class="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold px-2 py-0.5 rounded-md flex items-center gap-1" title="Nota: ${noteText}"><i class="fa-solid fa-receipt text-xs text-emerald-400"></i> ${noteText}</span>` : ''}
               </div>
             </div>
             <div class="text-right">
-              <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Valor al Cambio</span>
-              <span class="text-[11px] font-mono font-semibold text-slate-200 mt-0.5 block">${conversionDisplay}</span>
+              <span class="text-xs font-bold text-slate-300 uppercase tracking-wider block">Valor al Cambio</span>
+              <span class="text-xs font-mono font-bold text-slate-100 mt-0.5 block">${conversionDisplay}</span>
             </div>
           </div>
 
           <!-- Métricas de Rentabilidad: vs Oferta y vs Suelo -->
           <div class="space-y-1.5">
             <!-- vs Oferta Inicial Recibida -->
-            <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-2 py-1 flex items-center justify-between text-xs">
-              <span class="text-slate-400 text-[10px] font-semibold flex items-center gap-1">
-                <i class="fa-solid fa-hand-holding-dollar text-amber-400 text-[9px]"></i> vs Oferta inicial (${origKeys} TF2):
+            <div class="bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-xs">
+              <span class="text-slate-300 text-xs font-semibold flex items-center gap-1.5">
+                <i class="fa-solid fa-hand-holding-dollar text-amber-400 text-xs"></i> vs Oferta inicial (${origKeys} TF2):
               </span>
-              <div class="text-right font-mono text-[10px] font-bold">
+              <div class="text-right font-mono text-xs font-bold">
                 ${improvedOffer ? `
                   <span class="text-emerald-400">+${profitVsOfferEur.toFixed(2)} € (+${profitVsOfferPct.toFixed(1)}%)</span>
                 ` : sameOffer ? `
-                  <span class="text-slate-300">0.00 € (Aceptada)</span>
+                  <span class="text-slate-200">0.00 € (Aceptada)</span>
                 ` : `
                   <span class="text-rose-400">${profitVsOfferEur.toFixed(2)} € (${profitVsOfferPct.toFixed(1)}%)</span>
                 `}
@@ -685,21 +786,21 @@ function renderGamesGrid() {
             </div>
 
             <!-- vs Suelo de Mercado -->
-            <div class="${isFavorable ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border border-rose-800/50 text-rose-300'} px-2 py-1.5 rounded-lg flex items-center justify-between text-xs">
+            <div class="${isFavorable ? 'bg-emerald-950/40 border border-emerald-800/50 text-emerald-300' : 'bg-rose-950/40 border border-rose-800/50 text-rose-300'} px-2.5 py-1.5 rounded-lg flex items-center justify-between text-xs">
               <div>
-                <div class="flex items-center gap-1 font-bold text-[10px]">
-                  <i class="fa-solid ${isFavorable ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400'} text-[9px]"></i>
+                <div class="flex items-center gap-1.5 font-bold text-xs">
+                  <i class="fa-solid ${isFavorable ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-rose-400'} text-xs"></i>
                   <span>${isFavorable ? 'Trato Favorable' : 'Trato Desfavorable'}</span>
                 </div>
-                <div class="text-[9px] text-slate-400 font-mono">
+                <div class="text-xs text-slate-300 font-mono mt-0.5">
                   Suelo: ${floorP.toFixed(2)}€
                 </div>
               </div>
               <div class="text-right font-mono">
-                <span class="text-[11px] font-black ${isFavorable ? 'text-emerald-300' : 'text-rose-300'} block">
+                <span class="text-xs font-black ${isFavorable ? 'text-emerald-300' : 'text-rose-300'} block">
                   ${isFavorable ? '+' : ''}${profitEur.toFixed(2)} €
                 </span>
-                <span class="text-[9px] font-bold ${isFavorable ? 'text-emerald-400' : 'text-rose-400'} block">
+                <span class="text-xs font-bold ${isFavorable ? 'text-emerald-400' : 'text-rose-400'} block">
                   ${isFavorable ? '+' : ''}${profitPct.toFixed(1)}% sobre suelo
                 </span>
               </div>
@@ -710,9 +811,9 @@ function renderGamesGrid() {
     } else {
       centralContentHtml = `
         <!-- Tabla Unificada Transpuesta: Actual vs Mínimo con columna dedicada de Descuento -->
-        <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-2 text-xs space-y-1.5">
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 text-xs space-y-1.5">
           <!-- Cabecera de 4 columnas -->
-          <div class="grid grid-cols-4 text-[9px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/80 pb-1">
+          <div class="grid grid-cols-4 text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800/80 pb-1">
             <span>Tipo</span>
             <span class="text-center">Oficial</span>
             <span class="text-center">Keyshops</span>
@@ -720,22 +821,22 @@ function renderGamesGrid() {
           </div>
 
           <!-- Fila Actual -->
-          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans">Actual</span>
+          <div class="grid grid-cols-4 items-center text-xs font-mono py-0.5">
+            <span class="text-xs uppercase font-semibold text-slate-300 font-sans">Actual</span>
             <span class="text-center font-bold text-white">${curOfficialStr}</span>
-            <span class="text-center font-bold text-slate-200">${curKeyshopStr}</span>
+            <span class="text-center font-bold text-slate-100">${curKeyshopStr}</span>
             <div class="text-right">
-              ${curKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${curKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
+              ${curKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-bold text-xs">${curKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-xs">--</span>'}
             </div>
           </div>
 
           <!-- Fila Mínimo Histórico -->
-          <div class="grid grid-cols-4 items-center text-[11px] font-mono">
-            <span class="text-[9px] uppercase font-semibold text-slate-400 font-sans" title="Mínimo Histórico">Mínimo</span>
-            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_official_time || ''}">${histOfficialStr}</span>
-            <span class="text-center font-medium text-slate-300" title="${game.ggdeals_historical_keyshop_time || ''}">${histKeyshopStr}</span>
+          <div class="grid grid-cols-4 items-center text-xs font-mono py-0.5">
+            <span class="text-xs uppercase font-semibold text-slate-300 font-sans" title="Mínimo Histórico">Mínimo</span>
+            <span class="text-center font-medium text-slate-200" title="${game.ggdeals_historical_official_time || ''}">${histOfficialStr}</span>
+            <span class="text-center font-medium text-slate-200" title="${game.ggdeals_historical_keyshop_time || ''}">${histKeyshopStr}</span>
             <div class="text-right">
-              ${histKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-semibold text-[9px]">${histKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-[10px]">--</span>'}
+              ${histKeyshopDiscount ? `<span class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-bold text-xs">${histKeyshopDiscount}</span>` : '<span class="text-slate-600 font-mono text-xs">--</span>'}
             </div>
           </div>
         </div>
@@ -749,45 +850,57 @@ function renderGamesGrid() {
 
     const formattedPlayers = formatPlayersCount(game.steam_players_24h);
 
+    const platformBadgeHtml = (game.platform && game.platform !== 'STEAM') ? `
+      <div class="absolute top-1.5 left-1.5 z-10">
+        <span class="bg-amber-950/90 backdrop-blur border border-amber-600/80 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md" title="Plataforma: ${escapeHtml(game.platform)}">
+          <i class="fa-solid fa-gamepad text-xs"></i>
+          <span>${escapeHtml(game.platform)}</span>
+        </span>
+      </div>
+    ` : '';
+
     card.innerHTML = `
       <!-- Banner / Imagen Clickable para Editar -->
       <div onclick="openEditModal('${game.id}')" title="Haz clic en la imagen para editar cotización y datos" 
-           class="relative h-24 bg-slate-950 overflow-hidden group cursor-pointer border-b border-slate-800/80 transition duration-300 hover:ring-2 hover:ring-blue-500/30">
+           class="relative h-28 bg-slate-950 overflow-hidden group cursor-pointer border-b border-slate-800/80 transition duration-300 hover:ring-2 hover:ring-blue-500/40">
         <img src="${headerImage}" alt="${safeName}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" onerror="this.onerror=null; this.src='${FALLBACK_GAME_SVG}'">
-        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent"></div>
         
+        <!-- Badge flotante izquierda (Plataforma si no es Steam) -->
+        ${platformBadgeHtml}
+
         <!-- Badge flotante derecha (Comprador) -->
         ${game.buyer_name ? `
           <div class="absolute top-1.5 right-1.5 z-10">
-            <span class="bg-slate-900/90 backdrop-blur border border-slate-700/80 text-slate-300 text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-md" title="Comprador: ${escapeHtml(game.buyer_name)}">
-              <i class="fa-solid fa-user text-slate-400 text-[8px]"></i>
+            <span class="bg-indigo-950/90 backdrop-blur border border-indigo-600/80 text-indigo-200 text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 shadow-md" title="Comprador: ${escapeHtml(game.buyer_name)}">
+              <i class="fa-solid fa-user text-indigo-400 text-xs"></i>
               <span>${escapeHtml(game.buyer_name)}</span>
             </span>
           </div>
         ` : ''}
 
-        <div class="absolute bottom-1.5 left-2.5 right-2.5">
-          <h2 class="text-xs font-bold text-white line-clamp-1 group-hover:text-blue-300 transition" title="${safeName}">
+        <div class="absolute bottom-2 left-2.5 right-2.5">
+          <h2 class="text-sm font-bold text-white line-clamp-2 leading-tight drop-shadow group-hover:text-blue-300 transition" title="${safeName}">
             ${safeName}
           </h2>
         </div>
       </div>
 
       <!-- Contenido de la Ficha Compacto y Homogéneo -->
-      <div class="p-2.5 space-y-2 flex-1 flex flex-col justify-between">
+      <div class="p-3 space-y-2.5 flex-1 flex flex-col justify-between">
 
         <!-- Caja de Oferta Recibida (Valor al lado de oferta y precios Steam/Cash a la derecha) -->
-        <div class="bg-slate-950 border border-slate-800 p-2 rounded-lg flex items-center justify-between text-xs">
+        <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between text-xs">
           <div class="flex items-center gap-1.5 font-bold">
-            <span class="text-slate-400 font-semibold flex items-center gap-1 text-[11px]">
-              <i class="fa-solid fa-hand-holding-dollar text-amber-400"></i> Oferta:
+            <span class="text-slate-300 font-semibold flex items-center gap-1.5 text-xs">
+              <i class="fa-solid fa-hand-holding-dollar text-amber-400 text-sm"></i> Oferta:
             </span>
-            <span class="text-amber-400 text-sm font-black font-mono">${game.tf2_keys_offered} TF2</span>
+            <span class="text-amber-300 text-base font-black font-mono">${game.tf2_keys_offered} TF2</span>
           </div>
-          <div class="text-right text-[10px] font-mono font-medium text-slate-400 flex items-center gap-1">
-            <span class="text-slate-300">~${offerSteamEur.toFixed(2)}€ Steam</span>
+          <div class="text-right text-xs font-mono font-medium text-slate-300 flex items-center gap-1.5">
+            <span class="text-slate-200 font-semibold">~${offerSteamEur.toFixed(2)}€ Steam</span>
             <span class="text-slate-600">|</span>
-            <span class="text-emerald-400">~${offerCashEur.toFixed(2)}€ Cash</span>
+            <span class="text-emerald-400 font-bold">~${offerCashEur.toFixed(2)}€ Cash</span>
           </div>
         </div>
 
@@ -795,36 +908,36 @@ function renderGamesGrid() {
         ${centralContentHtml}
 
         <!-- Barra Inferior: Tags abajo a la izquierda | Enlaces al medio | Jugadores a la derecha -->
-        <div class="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-400 gap-2">
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs text-slate-300 gap-2">
           
           <!-- Etiquetas abajo a la izquierda (1º Estado, 2º Delisted) -->
-          <div class="flex items-center gap-1 flex-shrink-0">
+          <div class="flex items-center gap-1.5 flex-shrink-0">
             ${statusBadgeHtml}
             ${delistedBadge}
           </div>
 
           <!-- Enlaces Rápidos de Verificación (Steam, SteamDB, GG.deals) -->
-          <div class="flex items-center space-x-2.5 text-[10px]">
+          <div class="flex items-center space-x-2.5 text-xs">
             ${game.steam_app_id ? `
-              <a href="https://store.steampowered.com/app/${game.steam_app_id}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-medium" title="Ver en Steam Store">
-                <i class="fa-brands fa-steam text-xs"></i>
+              <a href="https://store.steampowered.com/app/${game.steam_app_id}" target="_blank" class="hover:text-white transition flex items-center gap-1 font-semibold text-slate-300" title="Ver en Steam Store">
+                <i class="fa-brands fa-steam text-sm"></i>
                 <span>Steam</span>
               </a>
-              <a href="https://steamdb.info/app/${game.steam_app_id}/" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-medium" title="Ver en SteamDB">
-                <i class="fa-solid fa-chart-simple text-[10px]"></i>
+              <a href="https://steamdb.info/app/${game.steam_app_id}/" target="_blank" class="hover:text-white transition flex items-center gap-1 font-semibold text-slate-300" title="Ver en SteamDB">
+                <i class="fa-solid fa-chart-simple text-xs"></i>
                 <span>SteamDB</span>
               </a>
             ` : ''}
-            <a href="https://gg.deals/games/?title=${encodeURIComponent(game.name)}" target="_blank" class="hover:text-slate-200 transition flex items-center gap-1 font-bold" title="Ver en GG.deals">
-              <i class="fa-solid fa-tags text-[10px]"></i>
+            <a href="https://gg.deals/games/?title=${encodeURIComponent(game.name)}" target="_blank" class="hover:text-white transition flex items-center gap-1 font-bold text-slate-300" title="Ver en GG.deals">
+              <i class="fa-solid fa-tags text-xs"></i>
               <span>GG.deals</span>
             </a>
           </div>
 
           <!-- Jugadores en las últimas 24h a la DERECHA DEL TODO con formato inteligente (K) -->
           <div class="flex items-center justify-end min-w-[58px] flex-shrink-0 text-right">
-            <span class="text-[10px] text-slate-400 font-mono font-medium flex items-center gap-1" title="Jugadores activos en Steam (últimas 24h): ${typeof game.steam_players_24h === 'number' ? game.steam_players_24h.toLocaleString() : 'N/D'}">
-              <i class="fa-solid fa-users text-slate-500 text-[9px]"></i>
+            <span class="text-xs text-slate-200 font-mono font-bold flex items-center gap-1" title="Jugadores activos en Steam (últimas 24h): ${typeof game.steam_players_24h === 'number' ? game.steam_players_24h.toLocaleString() : 'N/D'}">
+              <i class="fa-solid fa-users text-slate-400 text-xs"></i>
               <span>${formattedPlayers}</span>
             </span>
           </div>
@@ -875,18 +988,19 @@ function openEditModal(gameId) {
     editSoldPrice.value = initVal;
   }
   if (editSoldNote) editSoldNote.value = game.sold_note || '';
-
-  // Enlaces a Plataformas de Keyshops
   if (modalKeyshopLinks) {
     const qName = encodeURIComponent(game.name);
+    const kinguinText = "Kinguin (ROW)" + (game.kinguin_price_eur ? ` (${game.kinguin_price_eur.toFixed(2)}€)` : '');
+
     const platforms = [
-      { name: "Eneba", url: `https://www.eneba.com/store/all?text=${qName}`, icon: "fa-tag", color: "text-amber-400 hover:text-amber-300" },
-      { name: "Kinguin", url: `https://www.kinguin.net/listing?active=1&hide_out_of_stock=1&phrase=${qName}`, icon: "fa-crown", color: "text-orange-400 hover:text-orange-300" },
-      { name: "G2A", url: `https://www.g2a.com/search?query=${qName}`, icon: "fa-gamepad", color: "text-blue-400 hover:text-blue-300" },
+      { name: "Eneba", url: `https://www.eneba.com/store/all?text=${qName}&regions[]=global&types[]=game`, icon: "fa-tag", color: "text-amber-400 hover:text-amber-300" },
+      { name: kinguinText, url: game.kinguin_url || `https://www.kinguin.net/listing?active=1&hide_out_of_stock=1&phrase=${qName}&platform=Steam&region=Global`, icon: "fa-crown", color: "text-orange-400 hover:text-orange-300" },
+      { name: "G2A", url: `https://www.g2a.com/search?query=${qName}+Steam+Key+Global`, icon: "fa-gamepad", color: "text-blue-400 hover:text-blue-300" },
       { name: "CDKeys", url: `https://www.cdkeys.com/?q=${qName}`, icon: "fa-key", color: "text-emerald-400 hover:text-emerald-300" },
       { name: "Gamivo", url: `https://www.gamivo.com/search/${qName}`, icon: "fa-bag-shopping", color: "text-rose-400 hover:text-rose-300" },
       { name: "Driffle", url: `https://driffle.com/search?keyword=${qName}`, icon: "fa-shield", color: "text-purple-400 hover:text-purple-300" }
     ];
+
 
     modalKeyshopLinks.innerHTML = platforms.map(p => `
       <a href="${p.url}" target="_blank" class="bg-slate-900 hover:bg-slate-800 border border-slate-700/80 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition font-semibold ${p.color}">

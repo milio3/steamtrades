@@ -214,7 +214,7 @@ def test_games_display_and_fields_completeness(client):
         assert "name" in game and isinstance(game["name"], str) and len(game["name"]) > 0
         assert "tf2_keys_offered" in game and isinstance(game["tf2_keys_offered"], (int, float))
         assert "buyer_name" in game and (game["buyer_name"] is None or isinstance(game["buyer_name"], str))
-        assert "status" in game and game["status"] in ("pending", "listed", "sold", "issue")
+        assert "status" in game and game["status"] in ("pending", "listed", "sold", "issue", "archived")
         assert "is_delisted_steam" in game and isinstance(game["is_delisted_steam"], bool)
         assert "is_reviewed" in game and isinstance(game["is_reviewed"], bool)
         assert "counter_increase_tf2" in game and isinstance(game["counter_increase_tf2"], (int, float))
@@ -379,6 +379,51 @@ def test_import_csv_endpoint(client):
         client.delete(f"/api/games/{id1}")
         client.delete(f"/api/games/{id2}")
         client.delete(f"/api/games/{id3}")
+
+def test_search_games_endpoint(client):
+    response = client.get("/api/games/search?query=portal")
+    assert response.status_code == 200
+    results = response.json()
+    assert isinstance(results, list)
+    if len(results) > 0:
+        first = results[0]
+        assert "app_id" in first
+        assert "name" in first
+        assert "tiny_image" in first
+
+def test_inspect_game_endpoint(client):
+    # Probar con AppID conocido (ej: 677160 We Were Here Too)
+    response = client.get("/api/games/inspect?query=677160")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["app_id"] == 677160
+    assert "name" in data
+    assert "kinguin_url" in data
+    assert "links" in data
+    assert "steam" in data["links"]
+
+def test_add_game_by_name_and_kinguin_presence(client):
+    # Probar añadir juego pasando un nombre
+    payload = {
+        "query": "Portal 2",
+        "offer_price": 1.5,
+        "offer_currency": "TF2",
+        "buyer_name": "KinguinTestBuyer"
+    }
+    response = client.post("/api/games/add", json=payload)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    created = body["game"]
+    offer_id = created["id"]
+    try:
+        assert created["buyer_name"] == "KinguinTestBuyer"
+        assert "Portal 2" in created["name"]
+        assert "kinguin_url" in created
+        assert "kinguin_price_eur" in created
+        assert created["kinguin_in_stock"] is not None
+    finally:
+        client.delete(f"/api/games/{offer_id}")
 
 
 

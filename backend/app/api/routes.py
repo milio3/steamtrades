@@ -16,17 +16,28 @@ from backend.app.schemas.game import (
     BulkStatePayload,
     AddGamePayload,
     CsvImportPayload,
-    CsvImportRow
+    CsvImportRow,
+    GameSearchResult,
+    GameInspectOut
 )
 from backend.app.services.steam_service import (
     fetch_steam_app_details,
     fetch_live_tf2_key_price,
-    extract_app_id_from_url
+    extract_app_id_from_url,
+    search_steam_games,
+    fetch_full_steam_details
 )
 from backend.app.services.price_service import (
     calculate_offer_metrics,
-    sync_single_game
+    sync_single_game,
+    clean_game_slug,
+    scrape_ggdeals_game_data
 )
+from backend.app.services.kinguin_service import (
+    fetch_kinguin_row_price,
+    generate_kinguin_search_url
+)
+
 
 router = APIRouter(prefix="/api", tags=["Steam Keys"])
 
@@ -52,6 +63,10 @@ def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> Ga
     return GameOut(
         id=offer.id,
         app_id=app_id,
+        bundle=game.bundle if game else (offer.bundle or None),
+        platform=game.platform if game else "STEAM",
+        hb_status=game.hb_status if game else None,
+        key_url=game.key_url if game else None,
         name=game_name,
         buyer_name=offer.buyer_name,
         offer_price=offer.offer_price,
@@ -78,7 +93,11 @@ def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> Ga
         ggdeals_historical_keyshop_time=game.ggdeals_keyshop_hist_time if game else None,
         best_keyshop_price_eur=game.ggdeals_keyshop_current if game else None,
         best_keyshop_name=game.best_keyshop_name if game else None,
+        kinguin_price_eur=metrics.get("kinguin_price_eur") or (game.kinguin_price_eur if game else None),
+        kinguin_url=metrics.get("kinguin_url") or (game.kinguin_url if game else None),
+        kinguin_in_stock=metrics.get("kinguin_in_stock", True) if game else True,
         floor_price_eur=metrics["floor_price_eur"],
+
         floor_price_source=metrics["floor_price_source"],
         seller_loss_eur=metrics["seller_loss_eur"],
         seller_loss_percent=metrics["seller_loss_percent"],
@@ -256,11 +275,95 @@ def get_games(
         
     return results
 
+@router.get("/games/search", response_model=List[GameSearchResult])
+def search_games(query: str = Query(..., min_length=2)):
+    """Busca títulos en Steam Store por coincidencia de texto predictivo."""
+    return search_steam_games(query, limit=6)
+
+@router.get("/games/inspect", response_model=GameInspectOut)
+def inspect_game(query: str = Query(...)):
+    """API exclusiva para detectar toda la información de un juego vía nombre, AppID o URL."""
+    raw_query = query.strip()
+    app_id = extract_app_id_from_url(raw_query)
+    game_name = raw_query
+    
+    if not app_id:
+        found = search_steam_games(raw_query, limit=1)
+        if found:
+            app_id = found[0]["app_id"]
+            game_name = found[0]["name"]
+        else:
+            raise HTTPException(status_code=404, detail="No se encontró ningún juego coincidente en Steam.")
+            
+    details = fetch_full_steam_details(app_id)
+    final_name = details.get("name") or game_name
+    
+    # Cotizaciones de GG.deals y Kinguin ROW
+    slug = clean_game_slug(final_name)
+    gg_data = scrape_ggdeals_game_data(final_name)
+    kinguin_data = fetch_kinguin_row_price(final_name)
+    
+    # Cálculo de Suelo Referencial (Floor Price)
+    floor_candidates = []
+    if gg_data.get("current_keyshop") and gg_data["current_keyshop"] > 0.05:
+        floor_candidates.append((gg_data["current_keyshop"], "Keyshops (Actual)"))
+    if gg_data.get("hist_keyshop_low") and gg_data["hist_keyshop_low"] > 0.05:
+        floor_candidates.append((gg_data["hist_keyshop_low"], "Mín. Histórico Keyshops"))
+    if gg_data.get("hist_official_low") and gg_data["hist_official_low"] > 0.10:
+        floor_candidates.append((gg_data["hist_official_low"], "Mín. Histórico Oficial"))
+    if not floor_candidates and gg_data.get("current_official") and gg_data["current_official"] > 0.05:
+        floor_candidates.append((gg_data["current_official"], "Oficial (Actual)"))
+    elif not floor_candidates and details.get("price") and not details.get("is_delisted"):
+        floor_candidates.append((details["price"], "Steam Store"))
+        
+    floor_val, floor_src = min(floor_candidates, key=lambda x: x[0]) if floor_candidates else (None, "Pendiente")
+    
+    links = {
+        "steam": f"https://store.steampowered.com/app/{app_id}/",
+        "ggdeals": f"https://gg.deals/game/{slug}/",
+        "kinguin": kinguin_data.get("kinguin_url") or generate_kinguin_search_url(final_name)
+    }
+    
+    return GameInspectOut(
+        app_id=app_id,
+        name=final_name,
+        header_image=details.get("header_image"),
+        steam_price=details.get("price"),
+        is_delisted=bool(details.get("is_delisted", False)),
+        delisted_reason=details.get("reason"),
+        is_free=bool(details.get("is_free", False)),
+        genres=details.get("genres", []),
+        developers=details.get("developers", []),
+        publishers=details.get("publishers", []),
+        release_date=details.get("release_date"),
+        players_count=details.get("players_count"),
+        reviews=details.get("reviews", {}),
+        kinguin_price_eur=kinguin_data.get("kinguin_price_eur"),
+        kinguin_url=kinguin_data.get("kinguin_url"),
+        kinguin_in_stock=kinguin_data.get("kinguin_in_stock", True),
+        ggdeals_keyshop_current=gg_data.get("current_keyshop"),
+        best_keyshop_name=None,
+        ggdeals_official_current=gg_data.get("current_official"),
+        ggdeals_official_hist_low=gg_data.get("hist_official_low"),
+        ggdeals_keyshop_hist_low=gg_data.get("hist_keyshop_low"),
+        floor_price_eur=round(floor_val, 2) if floor_val else None,
+        floor_price_source=floor_src,
+        links=links
+    )
+
 @router.post("/games/add", response_model=Dict[str, Any])
 def add_game(payload: AddGamePayload, db: Session = Depends(get_db)):
-    app_id = extract_app_id_from_url(payload.steam_url)
+    raw_input = payload.query or payload.steam_url
+    if not raw_input or not raw_input.strip():
+        raise HTTPException(status_code=400, detail="Debe proporcionar un nombre, AppID o URL de Steam.")
+        
+    app_id = extract_app_id_from_url(raw_input)
     if not app_id:
-        raise HTTPException(status_code=400, detail="Debe proporcionar una URL o AppID válido de Steam.")
+        found = search_steam_games(raw_input.strip(), limit=1)
+        if found:
+            app_id = found[0]["app_id"]
+        else:
+            raise HTTPException(status_code=400, detail="No se encontró ningún juego en Steam con ese nombre o enlace.")
         
     settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
     details = fetch_steam_app_details(app_id)
@@ -289,6 +392,7 @@ def add_game(payload: AddGamePayload, db: Session = Depends(get_db)):
     # 2. Crear nueva oferta
     offer = Offer(
         app_id=app_id,
+        bundle=game.bundle,
         buyer_name=buyer,
         offer_price=offer_val,
         offer_currency=offer_curr,
@@ -299,6 +403,7 @@ def add_game(payload: AddGamePayload, db: Session = Depends(get_db)):
     db.refresh(offer)
     
     return {"status": "ok", "game": build_offer_out(offer, settings).model_dump()}
+
 
 @router.post("/games/bulk-state")
 def bulk_update_state(payload: BulkStatePayload, db: Session = Depends(get_db)):
@@ -395,6 +500,49 @@ def get_game_detail(game_id: str, db: Session = Depends(get_db)):
         
     return build_offer_out(offer, settings)
 
+@router.post("/games/{game_id}/sync", response_model=Dict[str, Any])
+def sync_single_game_prices(game_id: str, db: Session = Depends(get_db)):
+    """Consulta y sincroniza precios en vivo (Steam, GG.deals y Kinguin ROW) de un juego."""
+    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    try:
+        gid = int(game_id)
+        offer = db.query(Offer).filter(Offer.id == gid).first()
+        if not offer:
+            offer = db.query(Offer).filter(Offer.app_id == gid).first()
+    except ValueError:
+        offer = None
+
+    if not offer or not offer.game:
+        raise HTTPException(status_code=404, detail="Juego no encontrado")
+
+    # Ejecutar scraping y sincronización en vivo
+    sync_single_game(offer.game, settings)
+    db.commit()
+    db.refresh(offer)
+
+    return {"status": "ok", "game": build_offer_out(offer, settings).model_dump()}
+
+@router.post("/games/sync-batch", response_model=Dict[str, Any])
+def sync_batch_games_prices(payload: Dict[str, List[int]], db: Session = Depends(get_db)):
+    """Consulta y actualiza precios de una lista específica de juegos (ej. página actual)."""
+    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    game_ids = payload.get("ids", [])
+    updated_games = []
+
+    for gid in game_ids:
+        offer = db.query(Offer).filter(Offer.id == gid).first()
+        if not offer:
+            offer = db.query(Offer).filter(Offer.app_id == gid).first()
+        if offer and offer.game:
+            try:
+                sync_single_game(offer.game, settings)
+                updated_games.append(build_offer_out(offer, settings).model_dump())
+            except Exception as e:
+                print(f"Error sincronizando juego {gid}: {e}")
+
+    db.commit()
+    return {"status": "ok", "updated_count": len(updated_games), "games": updated_games}
+
 @router.delete("/games/{game_id}", response_model=Dict[str, Any])
 def delete_game(game_id: str, db: Session = Depends(get_db)):
     try:
@@ -432,13 +580,19 @@ def update_game(game_id: str, payload: GameUpdatePayload, db: Session = Depends(
         offer.offer_price = float(payload.offer_price)
     elif payload.tf2_keys_offered is not None:
         offer.offer_price = float(payload.tf2_keys_offered)
+    elif payload.status == "listed":
+        offer.offer_price = 0.0
         
     if payload.offer_currency is not None:
         offer.offer_currency = payload.offer_currency
+        
     if payload.counter_price is not None:
         offer.counter_price = float(payload.counter_price)
     elif payload.counter_increase_tf2 is not None:
         offer.counter_price = float(payload.counter_increase_tf2)
+    elif payload.status == "listed":
+        offer.counter_price = 0.0
+
     if payload.counter_currency is not None:
         offer.counter_currency = payload.counter_currency
         
@@ -461,8 +615,11 @@ def update_game(game_id: str, payload: GameUpdatePayload, db: Session = Depends(
         offer.sold_note = payload.sold_note.strip() if payload.sold_note else None
     if payload.issue_note is not None:
         offer.issue_note = payload.issue_note.strip() if payload.issue_note else None
+        
     if payload.buyer_name is not None:
-        offer.buyer_name = payload.buyer_name.strip() if payload.buyer_name.strip() else None
+        offer.buyer_name = payload.buyer_name.strip() if (payload.buyer_name and payload.buyer_name.strip()) else None
+    elif offer.status == "listed":
+        offer.buyer_name = None
         
     # Actualizar cotizaciones manuales si se proveen
     if offer.game:

@@ -107,3 +107,96 @@ def fetch_steam_players_count(app_id: int) -> Optional[int]:
         pass
 
     return None
+
+def search_steam_games(term: str, limit: int = 6) -> List[Dict[str, Any]]:
+    """Busca juegos por nombre usando la API pública de búsqueda de la tienda de Steam."""
+    if not term or len(term.strip()) < 2:
+        return []
+    
+    url = f"https://store.steampowered.com/api/storesearch/?term={requests.utils.quote(term.strip())}&l=spanish&cc=es"
+    results = []
+    try:
+        r = requests.get(url, headers=BROWSER_HEADERS, timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            items = data.get("items", [])
+            for it in items[:limit]:
+                app_id = it.get("id")
+                price_data = it.get("price")
+                final_price = (price_data.get("final", 0) / 100.0) if price_data else None
+                results.append({
+                    "app_id": app_id,
+                    "name": it.get("name"),
+                    "price_eur": final_price,
+                    "tiny_image": it.get("tiny_image") or f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/capsule_sm_120.jpg",
+                    "header_image": f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg"
+                })
+    except Exception:
+        pass
+    return results
+
+def fetch_steam_reviews_summary(app_id: int) -> Dict[str, Any]:
+    """Consulta el resumen oficial de análisis y opiniones de los usuarios en Steam."""
+    url = f"https://store.steampowered.com/appreviews/{app_id}?json=1&language=all&purchase_type=all"
+    summary = {
+        "review_score_desc": None,
+        "total_positive": 0,
+        "total_negative": 0,
+        "total_reviews": 0,
+        "positive_percent": None
+    }
+    try:
+        r = requests.get(url, headers=BROWSER_HEADERS, timeout=5)
+        if r.status_code == 200:
+            qs = r.json().get("query_summary", {})
+            pos = qs.get("total_positive", 0)
+            tot = qs.get("total_reviews", 0)
+            summary["review_score_desc"] = qs.get("review_score_desc")
+            summary["total_positive"] = pos
+            summary["total_negative"] = qs.get("total_negative", 0)
+            summary["total_reviews"] = tot
+            if tot > 0:
+                summary["positive_percent"] = round((pos / tot) * 100, 1)
+    except Exception:
+        pass
+    return summary
+
+def fetch_full_steam_details(app_id: int) -> Dict[str, Any]:
+    """Obtiene toda la información técnica, comunitaria y económica del juego en Steam."""
+    base_details = fetch_steam_app_details(app_id)
+    reviews = fetch_steam_reviews_summary(app_id)
+    players_count = fetch_steam_players_count(app_id)
+    
+    url = f"https://store.steampowered.com/api/appdetails?appids={app_id}&cc=es&l=spanish"
+    extra = {
+        "type": "game",
+        "genres": [],
+        "developers": [],
+        "publishers": [],
+        "release_date": None,
+        "screenshots": [],
+        "platforms": {"windows": True, "mac": False, "linux": False}
+    }
+    try:
+        r = requests.get(url, headers=BROWSER_HEADERS, timeout=8)
+        if r.status_code == 200:
+            app_data = r.json().get(str(app_id), {})
+            if app_data.get("success"):
+                d = app_data.get("data", {})
+                extra["type"] = d.get("type", "game")
+                extra["genres"] = [g.get("description") for g in d.get("genres", []) if "description" in g]
+                extra["developers"] = d.get("developers", [])
+                extra["publishers"] = d.get("publishers", [])
+                extra["release_date"] = d.get("release_date", {}).get("date")
+                extra["platforms"] = d.get("platforms", {})
+                extra["screenshots"] = [s.get("path_full") for s in d.get("screenshots", [])[:4] if "path_full" in s]
+    except Exception:
+        pass
+
+    return {
+        **base_details,
+        **extra,
+        "app_id": app_id,
+        "players_count": players_count,
+        "reviews": reviews
+    }

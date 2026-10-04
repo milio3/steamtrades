@@ -2,11 +2,50 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 class AddGamePayload(BaseModel):
-    steam_url: str
+    steam_url: Optional[str] = None
+    query: Optional[str] = None  # Soporta nombre, link o AppID
     offer_price: Optional[float] = None
     offer_currency: Optional[str] = "TF2"
     tf2_keys_offered: Optional[float] = 1.0
     buyer_name: Optional[str] = None
+
+class GameSearchResult(BaseModel):
+    app_id: int
+    name: str
+    price_eur: Optional[float] = None
+    tiny_image: Optional[str] = None
+    header_image: Optional[str] = None
+
+class GameInspectOut(BaseModel):
+    app_id: int
+    name: str
+    header_image: Optional[str] = None
+    steam_price: Optional[float] = None
+    is_delisted: bool = False
+    delisted_reason: Optional[str] = None
+    is_free: bool = False
+    genres: List[str] = []
+    developers: List[str] = []
+    publishers: List[str] = []
+    release_date: Optional[str] = None
+    players_count: Optional[int] = None
+    reviews: Dict[str, Any] = {}
+    
+    # Mercado / Kinguin
+    kinguin_price_eur: Optional[float] = None
+    kinguin_url: Optional[str] = None
+    kinguin_in_stock: bool = True
+    ggdeals_keyshop_current: Optional[float] = None
+    best_keyshop_name: Optional[str] = None
+    ggdeals_official_current: Optional[float] = None
+    ggdeals_official_hist_low: Optional[float] = None
+    ggdeals_keyshop_hist_low: Optional[float] = None
+    
+    # Valoración y Enlaces
+    floor_price_eur: Optional[float] = None
+    floor_price_source: Optional[str] = None
+    links: Dict[str, str] = {}
+
 
 class GameUpdatePayload(BaseModel):
     offer_price: Optional[float] = None
@@ -51,7 +90,11 @@ class OfferOut(BaseModel):
     counter_currency: str = "TF2"
     counter_increase_tf2: float = 0.0
     
-    # Metadatos del Juego
+    # Metadatos del Juego y Humble Bundle
+    bundle: Optional[str] = None
+    platform: Optional[str] = "STEAM"
+    hb_status: Optional[str] = None
+    key_url: Optional[str] = None
     steam_app_id: Optional[int] = None
     steam_header_image: Optional[str] = None
     is_delisted_steam: bool = False
@@ -75,7 +118,13 @@ class OfferOut(BaseModel):
     best_keyshop_price_eur: Optional[float] = None
     best_keyshop_name: Optional[str] = None
     
+    # Kinguin (Referencia ROW)
+    kinguin_price_eur: Optional[float] = None
+    kinguin_url: Optional[str] = None
+    kinguin_in_stock: Optional[bool] = True
+    
     floor_price_eur: Optional[float] = None
+
     floor_price_source: Optional[str] = None
     seller_loss_eur: Optional[float] = None
     seller_loss_percent: Optional[float] = None

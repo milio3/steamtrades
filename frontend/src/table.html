@@ -15,7 +15,7 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-slate-700 selection:text-white pb-28">
 
-  <!-- Encabezado Unificado (Idéntico en Tarjetas y Tabla) -->
+  <!-- Encabezado Unificado SteamTrades -->
   <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
     <div class="max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
       
@@ -35,126 +35,101 @@
         </div>
       </div>
 
-      <!-- Selector de Vistas en Cabecera -->
-      <div class="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-1 text-xs">
-        <a href="/" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/80 transition flex items-center gap-1.5 font-medium">
-          <i class="fa-solid fa-grip"></i> Tarjetas
-        </a>
-        <a href="/table" class="px-3.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-100 font-semibold flex items-center gap-1.5 shadow-sm">
-          <i class="fa-solid fa-table-list text-slate-300"></i> Tabla
-        </a>
+      <!-- Cotizaciones Oficiales de TF2 Keys en Cabecera -->
+      <div class="flex items-center gap-2.5 text-xs">
+        <div class="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-sm" title="Cotización oficial de TF2 Key en Steam Community Market">
+          <span class="text-slate-400 font-medium flex items-center gap-1.5">
+            <i class="fa-brands fa-steam text-slate-400"></i> Steam:
+          </span>
+          <span id="tf2-live-badge" class="font-bold text-slate-200 font-mono">2.02 €</span>
+        </div>
+        <div class="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-sm" title="Cotización de venta en efectivo (Cash / Dinero real)">
+          <span class="text-slate-400 font-medium flex items-center gap-1.5">
+            <i class="fa-solid fa-money-bill-wave text-emerald-400"></i> Cash:
+          </span>
+          <span id="tf2-cash-badge" class="font-bold text-emerald-400 font-mono">1.62 €</span>
+        </div>
+        <button id="btn-open-add-modal" class="h-[34px] px-3.5 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer ml-1">
+          <i class="fa-solid fa-plus text-blue-400 text-xs"></i>
+          <span>Añadir Juego</span>
+        </button>
       </div>
     </div>
   </header>
 
-  <!-- Contenido Principal (Espaciado milimétrico idéntico a Tarjetas usando gap-3.5) -->
+  <!-- Contenido Principal -->
   <main class="max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex-1 flex flex-col gap-3.5">
     
-    <!-- Barra de Control de la Tabla -->
+    <!-- Barra de Control y Filtros de la Tabla -->
     <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-3">
-      <!-- Buscador y Aumentos Rápidos -->
+      <!-- Buscador y Filtros -->
       <div class="flex items-center gap-2.5 flex-wrap">
         <div class="relative w-full sm:w-64">
-          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input id="search-table-input" type="text" placeholder="Buscar juego en la tabla..." 
-                 class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 transition">
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-slate-500 transition">
         </div>
 
-        <button id="btn-increase-all" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 rounded-xl font-medium text-xs transition flex items-center gap-1.5" title="Sumar +0.25 TF2 de aumento a todos">
-          <i class="fa-solid fa-plus text-slate-400"></i> +0.25 TF2 a Todos
-        </button>
-        <button id="btn-reset-all" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-rose-300 border border-slate-700 rounded-xl font-medium text-xs transition flex items-center gap-1.5" title="Restablecer todos los aumentos a 0">
-          <i class="fa-solid fa-rotate-left text-slate-500"></i> Restablecer Aumentos
-        </button>
+        <!-- Filtros de Estado de la Tabla -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button id="filter-table-listed" class="filter-table-btn active px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Juegos listados disponibles en catálogo">
+            <i class="fa-solid fa-tag"></i> Listados (<span id="count-table-listed">0</span>)
+          </button>
+          <button id="filter-table-pending" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos con oferta recibida y en trámite de negociación">
+            <i class="fa-solid fa-handshake"></i> En negociación (<span id="count-table-pending">0</span>)
+          </button>
+          <button id="filter-table-issue" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos fuera de stock o con incidencias">
+            <i class="fa-solid fa-circle-exclamation"></i> Incidencias (<span id="count-table-issue">0</span>)
+          </button>
+          <button id="filter-table-sold" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos vendidos">
+            <i class="fa-solid fa-circle-check"></i> Vendidos (<span id="count-table-sold">0</span>)
+          </button>
+          <button id="filter-table-archived" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Claves archivadas / no disponibles">
+            <i class="fa-solid fa-box-archive"></i> Archivados (<span id="count-table-archived">0</span>)
+          </button>
+          <button id="filter-table-delisted" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos retirados de Steam (Coleccionista)">
+            <i class="fa-solid fa-crown"></i> Coleccionista (<span id="count-table-delisted">0</span>)
+          </button>
+        </div>
       </div>
 
-      <!-- Sección Derecha: Contador de Revisados, Importar CSV y Exportar CSV -->
-      <div class="flex items-center gap-2.5 ml-auto flex-wrap">
-        <!-- Contador de Revisados Integrado en la Barra -->
-        <div class="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 h-[34px]">
-          <span class="text-slate-400 font-medium">Revisados:</span>
-          <span id="stat-reviewed-count" class="font-bold text-slate-200 font-mono tabular-nums">0</span>
-          <span class="text-slate-600">/</span>
-          <span id="stat-total-games-count" class="font-bold text-slate-400 font-mono tabular-nums">107</span>
-        </div>
-
+      <!-- Sección Derecha: Consultar Precios, Importar CSV y Exportar CSV -->
+      <div class="flex items-center gap-2 ml-auto flex-wrap">
         <!-- Input de archivo CSV oculto para Importación -->
         <input type="file" id="input-csv-import" accept=".csv" class="hidden">
 
+        <!-- Botón Consultar Precios de la Página / Sección -->
+        <button id="btn-sync-prices" type="button" class="h-[34px] px-3.5 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Consultar y actualizar cotizaciones de Steam, GG.deals y Kinguin de la página visible">
+          <i id="btn-sync-icon" class="fa-solid fa-arrows-rotate text-blue-400 text-xs"></i>
+          <span id="btn-sync-text">Consultar Precios</span>
+        </button>
+
+        <!-- Botón Generador de Tabla SteamTrades -->
+        <button id="btn-steamtrades-table" type="button" class="h-[34px] px-3.5 py-1.5 bg-gradient-to-r from-amber-950/60 to-slate-900 hover:from-amber-900/80 text-amber-200 border border-amber-600/70 hover:border-amber-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Generar tabla formateada para copiar y publicar en SteamTrades">
+          <i class="fa-solid fa-table-list text-amber-400 text-xs"></i>
+          <span>Tabla SteamTrades</span>
+        </button>
+
         <!-- Botón Importar CSV (Tono Verde Esmeralda Suave) -->
-        <button id="btn-import-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-300 border border-emerald-700/60 hover:border-emerald-500/80 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Cargar y aplicar datos, contraofertas y estados desde un archivo CSV">
+        <button id="btn-import-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-200 border border-emerald-600/70 hover:border-emerald-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Cargar y aplicar datos, contraofertas y estados desde un archivo CSV">
           <i class="fa-solid fa-file-import text-emerald-400 text-xs"></i>
           <span>Importar CSV</span>
         </button>
 
         <!-- Botón Exportar CSV (Tono Azul Suave) -->
-        <button id="btn-export-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-blue-950/35 hover:bg-blue-900/50 text-blue-300 border border-blue-700/60 hover:border-blue-500/80 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Descargar plantilla CSV con la lista de juegos y contraofertas">
-          <i class="fa-solid fa-file-export text-blue-400 text-xs"></i>
+        <button id="btn-export-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Descargar plantilla CSV con la lista de juegos y contraofertas">
+          <i class="fa-solid fa-file-export text-slate-400 text-xs"></i>
           <span>Exportar CSV</span>
         </button>
       </div>
     </div>
 
-    <!-- Tabla de Juegos y Contraofertas con Cabeceras Ordenables -->
+    <!-- Tabla Dinámica con Cabeceras Adaptables por Sección -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-xs">
-          <thead>
-            <!-- Fila Superior de Agrupación de Secciones -->
-            <tr class="text-[9.5px] uppercase font-bold border-b border-slate-800 text-center select-none">
-              <th colspan="6" class="py-1.5 bg-slate-950/90 text-slate-400 border-r border-slate-800">
-                Información del Juego & Referencias de Mercado
-              </th>
-              <th colspan="2" class="py-1.5 bg-slate-950/60 text-slate-300 border-r border-slate-800">
-                Oferta & Aumento
-              </th>
-              <th colspan="4" class="py-1.5 bg-slate-950/90 text-slate-300">
-                Contraoferta, Balance & Estado
-              </th>
-            </tr>
-            <!-- Fila de Cabeceras de Columna Ordenables al Hacer Clic -->
-            <tr class="text-slate-400 uppercase tracking-wider text-[9px] border-b border-slate-800 font-semibold select-none bg-slate-950/40">
-              <th onclick="handleSortTable('id')" class="sortable-th py-2 px-1.5 pl-2.5 w-12 text-center" title="Ordenar por ID de la oferta">
-                <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('name')" class="sortable-th py-2 px-2 min-w-[200px]" title="Ordenar por nombre alfabético">
-                <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-2 text-center min-w-[85px]" title="Ordenar por comprador">
-                <span class="inline-flex items-center justify-center gap-1">Comprador <i id="sort-icon-buyer" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('players')" class="sortable-th py-2 px-2 text-center min-w-[95px]" title="Ordenar por jugadores activos en Steam">
-                <span class="inline-flex items-center justify-center gap-1">Jugadores (24h) <i id="sort-icon-players" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-2 text-center min-w-[100px]" title="Ordenar por mínimo actual">
-                <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-2 text-center min-w-[100px] border-r border-slate-800" title="Ordenar por suelo mínimo de mercado">
-                <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              
-              <!-- Oferta y Aumento -->
-              <th onclick="handleSortTable('orig_tf2')" class="sortable-th py-2 px-2 text-center min-w-[95px]" title="Ordenar por oferta recibida">
-                <span class="inline-flex items-center justify-center gap-1">Oferta Recibida <i id="sort-icon-orig_tf2" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('increase')" class="sortable-th py-2 px-2 text-center min-w-[115px] border-r border-slate-800" title="Ordenar por aumento en TF2">
-                <span class="inline-flex items-center justify-center gap-1">Aumentar (TF2) <i id="sort-icon-increase" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              
-              <!-- Contraoferta y Balance -->
-              <th onclick="handleSortTable('counter_tf2')" class="sortable-th py-2 px-2 text-center min-w-[120px]" title="Ordenar por contraoferta final">
-                <span class="inline-flex items-center justify-center gap-1">Contraoferta TF2 <i id="sort-icon-counter_tf2" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('balance')" class="sortable-th py-2 px-2 text-center min-w-[115px]" title="Ordenar por ganancia (+) o pérdida (-) respecto al suelo">
-                <span class="inline-flex items-center justify-center gap-1">Balance vs Suelo <i id="sort-icon-balance" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('improvement')" class="sortable-th py-2 px-2 text-center min-w-[110px]" title="Ordenar por porcentaje de mejora">
-                <span class="inline-flex items-center justify-center gap-1">Mejora (% Suelo) <i id="sort-icon-improvement" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-              <th onclick="handleSortTable('reviewed')" class="sortable-th py-2 px-2 pr-2.5 text-center min-w-[80px]" title="Ordenar por estado revisado">
-                <span class="inline-flex items-center justify-center gap-1">Revisado <i id="sort-icon-reviewed" class="fa-solid fa-sort text-[8px] opacity-40"></i></span>
-              </th>
-            </tr>
+          <thead id="table-head">
+            <!-- Cabeceras dinámicas generadas en table.js según la sección -->
           </thead>
           <tbody id="table-body" class="divide-y divide-slate-800/60 font-medium text-slate-200">
             <!-- Filas dinámicas generadas en table.js -->
@@ -162,36 +137,73 @@
         </table>
       </div>
     </div>
+
+    <!-- Barra de Paginación (15 registros por página) -->
+    <div id="pagination-container" class="bg-slate-900 border border-slate-800 p-2.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="text-slate-400 font-mono">
+        Mostrando <span id="page-start-idx" class="text-white font-bold">0</span>-<span id="page-end-idx" class="text-white font-bold">0</span> de <span id="page-total-count" class="text-white font-bold">0</span> juegos
+      </div>
+      <div class="flex items-center gap-1.5 ml-auto">
+        <button id="btn-prev-page" class="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1">
+          <i class="fa-solid fa-chevron-left text-[10px]"></i> Anterior
+        </button>
+        <div id="pagination-pages" class="flex items-center gap-1">
+          <!-- Botones de páginas generados dinámicamente -->
+        </div>
+        <button id="btn-next-page" class="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1">
+          Siguiente <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </button>
+      </div>
+    </div>
   </main>
 
-  <!-- Modal para Añadir Nuevo Juego por Link de Steam -->
+  <!-- Modal para Añadir Nuevo Juego (Omni-input: Nombre, URL o AppID) -->
   <div id="modal-add-game" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl shadow-2xl p-5 space-y-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl shadow-2xl p-5 space-y-4 relative">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
           <i class="fa-brands fa-steam text-slate-300 text-xl"></i>
-          <h3 class="font-bold text-sm text-slate-100">Añadir Juego por Link de Steam</h3>
+          <h3 class="font-bold text-sm text-slate-100">Añadir Juego</h3>
         </div>
         <button id="btn-close-add-modal" class="text-slate-400 hover:text-slate-200 text-lg">&times;</button>
       </div>
       
       <div class="space-y-3 text-xs">
-        <div>
-          <label class="block text-slate-300 font-semibold mb-1">URL de la Tienda de Steam:</label>
-          <input id="input-steam-url" type="url" placeholder="https://store.steampowered.com/app/620/Portal_2/" 
-                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono">
-          <p class="text-[11px] text-slate-500 mt-1">Se extraerán automáticamente precios, datos de GG.deals, estado y jugadores 24h.</p>
+        <div class="relative">
+          <label class="block text-slate-300 font-semibold mb-1">Nombre, URL o AppID de Steam:</label>
+          <div class="relative">
+            <input id="input-steam-url" type="text" autocomplete="off" placeholder="Ej: Cyberpunk 2077 o https://store.steampowered.com/app/..." 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono pr-8">
+            <div id="search-spinner" class="hidden absolute right-3 top-2.5 text-slate-400">
+              <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+            </div>
+          </div>
+          <!-- Dropdown con autocompletado en vivo -->
+          <div id="search-suggestions-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800">
+          </div>
+          <!-- Previsualización del juego detectado -->
+          <div id="add-game-preview-card" class="hidden mt-2 p-2 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center gap-2.5">
+            <img id="preview-img" src="" class="w-14 h-7 object-cover rounded shadow flex-shrink-0">
+            <div class="flex-1 min-w-0">
+              <div id="preview-name" class="font-bold text-slate-200 truncate">--</div>
+              <div class="text-[10px] text-slate-400 font-mono flex items-center gap-2">
+                <span id="preview-appid">AppID: --</span>
+                <span id="preview-price" class="text-emerald-400">-- €</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">Escribe para buscar o pega el enlace. Se obtendrán precios de Steam, GG.deals, Kinguin (ROW) y jugadores.</p>
         </div>
         
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Oferta Inicial (TF2):</label>
-            <input id="input-tf2-keys" type="number" step="0.25" min="0" value="1.0" 
+            <input id="input-tf2-keys" type="number" step="0.25" min="0" placeholder="0.00 (Opcional)" 
                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
           </div>
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Comprador:</label>
-            <input id="input-buyer-name" type="text" placeholder="Ej: xMjalino, Comprador1..." 
+            <input id="input-buyer-name" type="text" placeholder="Comprador (opcional)" 
                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 font-mono focus:outline-none focus:border-slate-500">
           </div>
         </div>
@@ -203,118 +215,207 @@
           <i class="fa-solid fa-plus"></i> Añadir y Calcular
         </button>
       </div>
+
     </div>
   </div>
 
-  <!-- Modal de Edición de Juego (Accesible al pinchar en el juego) -->
-  <div id="edit-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-    <div class="bg-slate-900 border border-slate-700 max-w-lg w-full rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4">
+  <!-- Modal de Detalle y Edición de Juego (Estilo Tarjeta Visual Panorámica) -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 max-w-2xl w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[95vh]">
       
-      <!-- Cabecera del Modal con Miniatura y AppID -->
-      <div class="flex justify-between items-start border-b border-slate-800 pb-3.5">
-        <div class="flex items-center gap-3">
-          <img id="modal-game-img" src="" alt="" class="w-12 h-6 object-cover rounded-md border border-slate-700 flex-shrink-0 shadow-sm">
-          <div>
-            <h3 id="modal-game-title" class="font-bold text-sm sm:text-base text-slate-100 line-clamp-1">Nombre del Juego</h3>
-            <span id="modal-game-appid" class="text-[10px] text-slate-400 font-mono font-medium block mt-0.5">AppID: --</span>
+      <!-- Cabecera Panorámica de la Tarjeta con Imagen Real del Juego -->
+      <div class="relative h-36 sm:h-40 bg-slate-950 overflow-hidden flex-shrink-0 border-b border-slate-800">
+        <img id="modal-game-img" src="" alt="" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent"></div>
+        
+        <!-- Botón Cerrar Arriba a la Derecha -->
+        <button id="btn-close-modal" type="button" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-950/80 backdrop-blur border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white flex items-center justify-center transition shadow-lg z-10" title="Cerrar ventana">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+
+        <!-- Badges Flotantes Arriba a la Izquierda -->
+        <div class="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap z-10">
+          <span id="modal-badge-status" class="bg-slate-800/90 backdrop-blur border border-slate-600 text-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-md">
+            <i class="fa-solid fa-tag text-xs text-slate-400"></i> Listado
+          </span>
+          <span id="modal-badge-platform" class="hidden bg-amber-950/90 backdrop-blur border border-amber-600 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg items-center gap-1 shadow-md">
+            <i class="fa-solid fa-gamepad text-xs"></i> <span id="modal-platform-text">STEAM</span>
+          </span>
+          <span id="modal-badge-delisted" class="hidden bg-amber-950/90 backdrop-blur border border-amber-600 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg items-center gap-1 shadow-md" title="Artículo de Coleccionista">
+            <i class="fa-solid fa-crown text-amber-400 text-xs"></i> Coleccionista
+          </span>
+        </div>
+
+        <!-- Título y Metadatos Abajo -->
+        <div class="absolute bottom-2.5 left-4 right-4">
+          <h3 id="modal-game-title" class="font-black text-base sm:text-lg text-white leading-tight drop-shadow-md line-clamp-2">
+            Nombre del Juego
+          </h3>
+          <div class="flex items-center gap-3 text-xs text-slate-300 mt-1 flex-wrap font-mono">
+            <span id="modal-game-appid" class="text-slate-400">AppID: --</span>
+            <span id="modal-game-bundle" class="hidden text-slate-300 truncate max-w-[280px] font-sans">
+              <i class="fa-solid fa-box text-xs text-slate-400 mr-1"></i><span id="modal-bundle-text">--</span>
+            </span>
+            <span id="modal-game-players" class="text-slate-300 ml-auto flex items-center gap-1">
+              <i class="fa-solid fa-users text-slate-400 text-xs"></i>
+              <span id="modal-players-text">-- jugadores</span>
+            </span>
           </div>
         </div>
-        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-200 transition p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
       </div>
 
-      <form id="edit-form" class="space-y-3.5 text-xs">
+      <!-- Barra de Enlaces Directos Externos y Actualización de Precios -->
+      <div class="bg-slate-950/80 border-b border-slate-800 px-4 py-2 flex items-center justify-between gap-2 text-xs flex-shrink-0 flex-wrap">
+        <div class="flex items-center gap-2">
+          <button id="btn-modal-sync-price" type="button" class="px-2.5 py-1 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-600/70 hover:border-blue-500 rounded-lg text-blue-200 hover:text-white transition flex items-center gap-1.5 font-bold text-xs cursor-pointer shadow-sm" title="Consultar cotizaciones de Steam, GG.deals y Kinguin para este juego">
+            <i id="modal-sync-icon" class="fa-solid fa-arrows-rotate text-xs text-blue-400"></i>
+            <span id="modal-sync-text">Actualizar Precios</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-up-right-from-square text-[10px]"></i> Ver en:
+          </span>
+          <a id="modal-link-steam" href="#" target="_blank" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1 font-semibold">
+            <i class="fa-brands fa-steam text-xs"></i> Steam
+          </a>
+          <a id="modal-link-steamdb" href="#" target="_blank" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1 font-semibold">
+            <i class="fa-solid fa-chart-simple text-xs"></i> SteamDB
+          </a>
+          <a id="modal-link-ggdeals" href="#" target="_blank" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition flex items-center gap-1 font-bold">
+            <i class="fa-solid fa-tags text-xs"></i> GG.deals
+          </a>
+        </div>
+      </div>
+
+      <!-- Formulario y Paneles Deslizables -->
+      <form id="edit-form" class="p-4 sm:p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
         <input type="hidden" id="edit-game-id">
 
-        <!-- URL de Steam -->
-        <div>
-          <label class="block text-slate-300 font-semibold mb-1">URL de la Tienda de Steam:</label>
-          <input id="edit-steam-url" type="url" placeholder="https://store.steampowered.com/app/..." 
-                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+        <!-- Panel de Cotizaciones de Mercado (Idéntico a Tarjetas) -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 space-y-2">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-chart-line text-blue-400"></i> Referencias de Mercado
+            </span>
+            <div id="modal-floor-badge" class="text-xs font-mono font-bold text-slate-200">
+              Suelo: <span id="modal-floor-val" class="text-emerald-400">-- €</span>
+            </div>
+          </div>
+
+          <!-- Tabla 4 Columnas: Tipo | Oficial | Keyshops | Descuento -->
+          <div class="grid grid-cols-4 text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60 pb-1">
+            <span>Tipo</span>
+            <span class="text-center">Oficial</span>
+            <span class="text-center">Keyshops</span>
+            <span class="text-right">Dto.</span>
+          </div>
+
+          <!-- Fila Actual -->
+          <div class="grid grid-cols-4 items-center text-xs font-mono py-0.5">
+            <span class="text-xs uppercase font-semibold text-slate-300 font-sans">Actual</span>
+            <span id="modal-cur-official" class="text-center font-bold text-white">--</span>
+            <span id="modal-cur-keyshop" class="text-center font-bold text-slate-200">--</span>
+            <div class="text-right">
+              <span id="modal-cur-discount" class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-bold text-xs">--</span>
+            </div>
+          </div>
+
+          <!-- Fila Mínimo Histórico -->
+          <div class="grid grid-cols-4 items-center text-xs font-mono py-0.5">
+            <span class="text-xs uppercase font-semibold text-slate-300 font-sans">Mínimo</span>
+            <span id="modal-hist-official" class="text-center font-medium text-slate-200">--</span>
+            <span id="modal-hist-keyshop" class="text-center font-medium text-slate-200">--</span>
+            <div class="text-right">
+              <span id="modal-hist-discount" class="bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded font-sans font-bold text-xs">--</span>
+            </div>
+          </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <!-- Fila de Estado, Comprador y Precios de Negociación -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Selector de Estado Principal -->
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Estado del Juego:</label>
+            <select id="edit-status" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-bold text-xs focus:outline-none focus:border-blue-500">
+              <option value="listed">Listado (Disponible)</option>
+              <option value="pending">En negociación</option>
+              <option value="issue">Incidencia</option>
+              <option value="sold">Vendido</option>
+              <option value="archived">Archivado / No disponible</option>
+            </select>
+          </div>
+
+          <!-- Oferta Recibida (TF2) -->
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Oferta Recibida (TF2):</label>
             <input id="edit-tf2-keys" type="number" step="0.25" min="0" 
-                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-sm focus:outline-none focus:border-slate-500">
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold text-sm focus:outline-none focus:border-amber-500">
           </div>
+
+          <!-- Comprador (Placeholder sin xMjalino por defecto) -->
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Comprador:</label>
-            <input id="edit-buyer-name" type="text" placeholder="xMjalino" 
-                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono text-sm focus:outline-none focus:border-slate-500">
+            <input id="edit-buyer-name" type="text" placeholder="Comprador (opcional)" 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 font-mono text-xs focus:outline-none focus:border-blue-500">
           </div>
         </div>
 
-        <!-- Precios Actuales -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-slate-400 font-semibold mb-1">Precio Actual Oficial (€):</label>
-            <input id="edit-official-price" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
+        <!-- Panel Dinámico si está en Vendido -->
+        <div id="sold-keys-container" class="hidden bg-emerald-950/30 border border-emerald-800/60 p-3 rounded-xl space-y-2.5">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-300 border-b border-emerald-800/40 pb-1">
+            <i class="fa-solid fa-receipt text-emerald-400"></i>
+            <span>Datos de Venta Cerrada</span>
           </div>
-          <div>
-            <label class="block text-slate-400 font-semibold mb-1">Precio Actual Keyshops (€):</label>
-            <input id="edit-keyshop-price" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
-          </div>
-        </div>
-
-        <!-- Mínimos Históricos -->
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-slate-400 font-semibold mb-1">Mínimo Histórico Oficial (€):</label>
-            <input id="edit-hist-official" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
-          </div>
-          <div>
-            <label class="block text-slate-400 font-semibold mb-1">Mínimo Histórico Keyshops (€):</label>
-            <input id="edit-hist-keyshop" type="number" step="0.01" min="0" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
-          </div>
-        </div>
-
-        <!-- Estado de Venta / Transacción Cerrada -->
-        <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl space-y-3">
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" id="edit-is-sold" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0 cursor-pointer">
-              <span class="font-bold text-slate-200 text-xs">Marcar juego como VENDIDO</span>
-            </label>
-            <span id="sold-badge" class="hidden text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-700 px-2 py-0.5 rounded font-bold">
-              <i class="fa-solid fa-check"></i> VENDIDO
-            </span>
-          </div>
-
-          <div id="sold-keys-container" class="hidden pt-2 border-t border-slate-800/80 flex flex-col gap-2.5">
-            <div class="grid grid-cols-2 gap-2.5">
-              <div>
-                <label class="block text-slate-400 font-semibold text-[11px] mb-1">Método / Moneda:</label>
-                <select id="edit-sold-currency" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-semibold text-xs focus:outline-none focus:border-emerald-500">
-                  <option value="TF2" selected>TF2 Keys (TF2)</option>
-                  <option value="EUR">Dinero Real (€)</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-slate-400 font-semibold text-[11px] mb-1">Precio acordado:</label>
-                <div class="flex items-center gap-1.5">
-                  <input id="edit-sold-price" type="number" step="0.25" min="0" placeholder="0.00" 
-                         class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-mono text-xs focus:outline-none focus:border-emerald-500">
-                  <span id="edit-sold-currency-label" class="text-slate-400 font-bold text-xs flex-shrink-0">TF2</span>
-                </div>
-              </div>
-            </div>
-
+          <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-slate-400 font-semibold text-[11px] mb-1">Comentario / Nota de pago:</label>
-              <input id="edit-sold-note" type="text" placeholder="Ej: Pago Paypal, Bizum, Comprador X..." 
-                     class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-emerald-500">
+              <label class="block text-slate-300 font-semibold mb-1">Método / Moneda:</label>
+              <select id="edit-sold-currency" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-semibold text-xs focus:outline-none focus:border-emerald-500">
+                <option value="TF2" selected>TF2 Keys (TF2)</option>
+                <option value="EUR">Dinero Real (€)</option>
+              </select>
             </div>
+            <div>
+              <label class="block text-slate-300 font-semibold mb-1">Precio Cobrado:</label>
+              <div class="flex items-center gap-1.5">
+                <input id="edit-sold-price" type="number" step="0.25" min="0" placeholder="0.00" 
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-emerald-400 font-mono font-black text-sm focus:outline-none focus:border-emerald-500">
+                <span id="edit-sold-currency-label" class="text-slate-300 font-bold text-xs flex-shrink-0">TF2</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Comentario / Nota de Venta:</label>
+            <input id="edit-sold-note" type="text" placeholder="Ej: Vendido a xMjalino, cobrado por PayPal..." 
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none focus:border-emerald-500">
           </div>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2">
-          <button type="button" id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-medium transition">Cancelar</button>
-          <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition shadow-md hover:shadow-blue-600/30 flex items-center gap-1.5">
-            <i class="fa-solid fa-check"></i> Guardar Cambios
+        <!-- Panel Dinámico si está en Incidencia -->
+        <div id="issue-container" class="hidden bg-rose-950/30 border border-rose-800/60 p-3 rounded-xl space-y-2">
+          <div class="flex items-center gap-1.5 text-xs font-bold text-rose-300 border-b border-rose-800/40 pb-1">
+            <i class="fa-solid fa-circle-exclamation text-rose-400"></i>
+            <span>Motivo de la Incidencia / Fuera de Stock</span>
+          </div>
+          <input id="edit-issue-note" type="text" placeholder="Ej: Agotada temporalmente, clave inválida..." 
+                 class="w-full bg-slate-950 border border-rose-700 rounded-xl px-3 py-2 text-rose-200 text-xs focus:outline-none focus:border-rose-500">
+        </div>
+
+        <!-- Botones de Acción al Pie del Modal -->
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2 flex-shrink-0">
+          <button type="button" id="btn-delete-game" class="px-3.5 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 hover:border-rose-600 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-trash-can text-xs"></i>
+            <span>Eliminar</span>
           </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button type="button" id="btn-cancel-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold text-xs transition">
+              Cancelar
+            </button>
+            <button type="submit" id="btn-submit-modal" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
+              <i class="fa-solid fa-check"></i>
+              <span>Guardar Cambios</span>
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -352,7 +453,7 @@
         <div class="bg-slate-950 border border-purple-800/60 p-2.5 rounded-xl">
           <div class="flex items-center justify-between">
             <span class="text-purple-400 font-bold flex items-center gap-1">
-              <i class="fa-solid fa-clock text-[10px]"></i> Tramitados
+              <i class="fa-solid fa-handshake text-[10px]"></i> En negociación
             </span>
             <span id="import-stat-pending-count" class="font-black text-sm text-purple-300 font-mono">0</span>
           </div>
@@ -390,76 +491,153 @@
     </div>
   </div>
 
-  <!-- Barra Flotante Inferior de Estadísticas & Totales (Footer con métricas homogéneas y Cotización TF2) -->
+  <!-- Modal Generador de Tabla SteamTrades (Markdown) -->
+  <div id="modal-steamtrades-export" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 max-w-4xl w-full rounded-2xl shadow-2xl p-5 space-y-4 max-h-[92vh] flex flex-col">
+      <!-- Cabecera -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-950/60 border border-amber-600/60 flex items-center justify-center text-amber-400">
+            <i class="fa-solid fa-table-list text-base"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2">
+              <span>Generador de Tabla para SteamTrades</span>
+              <span class="text-[10px] bg-amber-950 text-amber-300 border border-amber-800/80 px-2 py-0.5 rounded-full font-mono font-bold">Markdown</span>
+            </h3>
+            <p class="text-xs text-slate-400">Genera una tabla lista para copiar y publicar en tus hilos de intercambio de SteamTrades</p>
+          </div>
+        </div>
+        <button id="btn-close-st-modal" class="text-slate-400 hover:text-slate-200 text-xl leading-none cursor-pointer">&times;</button>
+      </div>
+
+      <!-- Filtros de Configuración de la Tabla -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-950 border border-slate-800 p-3 rounded-xl flex-shrink-0 text-xs">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Alcance:</label>
+          <select id="st-export-scope" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none text-xs">
+            <option value="listed_all">Todos los juegos listados</option>
+            <option value="listed_page">Página actual visible (15 juegos)</option>
+            <option value="current_view">Vista / Pestaña actual completa</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Columna de Precio:</label>
+          <select id="st-export-price-format" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none text-xs">
+            <option value="tf2_eur">TF2 Keys + Aprox € (ej. 0.50 TF2 (~0.80 €))</option>
+            <option value="tf2_only">Solo TF2 Keys (ej. 0.50 TF2)</option>
+            <option value="eur_only">Solo Euros (ej. 0.80 €)</option>
+            <option value="none">Sin columna de precio</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Formato de Columnas:</label>
+          <select id="st-export-spacing" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none text-xs">
+            <option value="aligned">Alineado con espacios (Formato SteamTrades ancho)</option>
+            <option value="compact">Compacto estándar (|Game|Bundle|...|)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Área de Texto / Vista Previa Markdown -->
+      <div class="flex-1 flex flex-col min-h-[260px]">
+        <div class="flex items-center justify-between mb-1.5 text-xs text-slate-400">
+          <span>Vista previa Markdown (<span id="st-preview-count" class="text-amber-400 font-bold font-mono">0</span> juegos):</span>
+          <span class="text-[10px] text-slate-500">Sintaxis Markdown 100% compatible con SteamTrades Forum</span>
+        </div>
+        <textarea id="st-markdown-output" readonly class="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-200 selection:bg-amber-600 selection:text-white focus:outline-none focus:border-slate-600 resize-none whitespace-pre overflow-auto"></textarea>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="pt-3 border-t border-slate-800 flex items-center justify-between gap-2 flex-shrink-0">
+        <span id="st-copy-status" class="text-xs text-emerald-400 font-bold hidden flex items-center gap-1.5">
+          <i class="fa-solid fa-circle-check"></i> ¡Copiado al portapapeles!
+        </span>
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" id="btn-cancel-st-modal" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold text-xs transition cursor-pointer">
+            Cerrar
+          </button>
+          <button type="button" id="btn-download-st-markdown" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-slate-200 font-bold text-xs transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-download text-slate-400"></i> Descargar .txt
+          </button>
+          <button type="button" id="btn-copy-st-markdown" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-copy"></i> Copiar al Portapapeles
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra Flotante Inferior de Estadísticas & Totales (Métricas globales fijas siempre visibles) -->
   <aside class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 shadow-xl z-40 py-2.5">
     <div class="max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 w-full">
         
-        <!-- 1. Total Juegos Activos -->
-        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm">
+        <!-- 1. Juegos Disponibles (En catálogo para venta/cambio) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Juegos disponibles en catálogo (Listados)">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-gamepad text-slate-400"></i> Total Juegos
+              <i class="fa-solid fa-tag text-blue-400"></i> Juegos disponibles
             </span>
             <div class="flex items-baseline gap-1 mt-0.5 font-mono">
-              <span id="stat-table-total-count" class="text-base font-black text-white">--</span>
-              <span class="text-[10px] text-slate-500 font-sans font-medium">activos</span>
+              <span id="stat-available-games" class="text-base font-black text-white">0</span>
+              <span class="text-[10px] text-slate-500 font-sans font-medium">en catálogo</span>
             </div>
           </div>
         </div>
 
-        <!-- 2. Oferta Original (Rojo Suave) -->
-        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Oferta recibida inicial en TF2 y su equivalencia en efectivo (€)">
+        <!-- 2. Juegos en Negociación (En trámite) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Juegos con oferta recibida en negociación activa">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-key text-rose-400"></i> Oferta Original
+              <i class="fa-solid fa-handshake text-purple-400"></i> Juegos en negociación
             </span>
-            <div class="flex items-baseline gap-1.5 mt-0.5 font-mono">
-              <span id="stat-orig-keys" class="text-base font-black text-rose-400 tabular-nums">-- TF2</span>
-              <span id="stat-orig-cash" class="text-xs font-semibold text-rose-400/80 tabular-nums">(-- €)</span>
+            <div class="flex items-baseline gap-1 mt-0.5 font-mono">
+              <span id="stat-pending-games" class="text-base font-black text-purple-300">0</span>
+              <span class="text-[10px] text-slate-500 font-sans font-medium">ofertas</span>
             </div>
           </div>
         </div>
 
-        <!-- 3. Tu Contraoferta (Azul) -->
-        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Contraoferta total propuesta para el comprador">
+        <!-- 3. Oferta en Negociación (TF2 y Efectivo) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Suma total de ofertas recibidas en juegos actualmente en negociación">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-hand-holding-dollar text-blue-400"></i> Contraoferta Total
+              <i class="fa-solid fa-key text-amber-400"></i> Oferta en negociación
             </span>
             <div class="flex items-baseline gap-1.5 mt-0.5 font-mono">
-              <span id="stat-counter-keys" class="text-base font-black text-blue-400 tabular-nums">-- TF2</span>
-              <span id="stat-counter-cash" class="text-xs font-semibold text-blue-400/80 tabular-nums">(-- €)</span>
+              <span id="stat-pending-offer-keys" class="text-base font-black text-amber-400 tabular-nums">0.00 TF2</span>
+              <span id="stat-pending-offer-cash" class="text-xs font-semibold text-amber-300/80 tabular-nums">(~0.00 €)</span>
             </div>
           </div>
         </div>
 
-        <!-- 4. Mejora Obtenida (Verde) -->
-        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Incremento respecto a la oferta original">
+        <!-- 4. Ventas Realizadas (Juegos vendidos e ingresos acumulados) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Total de ventas cerradas e ingresos realizados">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-arrow-trend-up text-emerald-400"></i> Mejora Total
+              <i class="fa-solid fa-circle-check text-emerald-400"></i> Ventas realizadas
             </span>
             <div class="flex items-baseline gap-1.5 mt-0.5 font-mono">
-              <span id="stat-gain-keys" class="text-base font-black text-emerald-400 tabular-nums">+0.00 TF2</span>
-              <span id="stat-gain-cash" class="text-xs font-semibold text-emerald-400/80 tabular-nums">(+0.00 €)</span>
+              <span id="stat-sold-count" class="text-base font-black text-emerald-400 tabular-nums">0</span>
+              <span id="stat-sold-total-cash" class="text-xs font-semibold text-emerald-300/80 tabular-nums">(0.00 €)</span>
             </div>
           </div>
         </div>
 
-        <!-- 5. Cotización TF2 Key en Vivo (Mismo tamaño y armonía de color) -->
+        <!-- 5. Cotización TF2 Key en Vivo -->
         <a href="https://steamcommunity.com/market/listings/440/Mann%20Co.%20Supply%20Crate%20Key" target="_blank" 
            id="tf2-market-link" title="Ver cotización oficial en Steam Community Market" 
            class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm hover:border-slate-700 transition group cursor-pointer">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-key text-amber-400"></i>
+              <i class="fa-solid fa-chart-line text-amber-400"></i>
               <span class="group-hover:text-amber-300 transition">Cotización TF2 Key</span>
             </span>
             <div class="flex items-baseline gap-1 mt-0.5 font-mono">
-              <span id="tf2-live-badge" class="text-base font-black text-amber-400 tabular-nums">-- €</span>
+              <span id="tf2-live-badge-footer" class="text-base font-black text-amber-400 tabular-nums">2.02 €</span>
               <span class="text-amber-600/60 text-xs">|</span>
-              <span id="tf2-cash-badge" class="text-xs font-bold text-amber-300/90 tabular-nums">-- €</span>
+              <span id="tf2-cash-badge-footer" class="text-xs font-bold text-amber-300/90 tabular-nums">1.62 €</span>
               <span id="tf2-last-update" class="text-[9px] text-slate-500 ml-1 font-mono"></span>
             </div>
           </div>
