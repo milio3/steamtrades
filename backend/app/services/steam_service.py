@@ -1,6 +1,6 @@
 import re
 import requests
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from bs4 import BeautifulSoup
 from backend.app.core.config import BROWSER_HEADERS
 
