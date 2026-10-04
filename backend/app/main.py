@@ -55,8 +55,16 @@ if FRONTEND_SRC_DIR.exists():
     def serve_table_view():
         return FileResponse(FRONTEND_SRC_DIR / "table.html")
 
+    @app.get("/table.html", include_in_schema=False)
+    def serve_table_html_view():
+        return FileResponse(FRONTEND_SRC_DIR / "table.html")
+
     @app.get("/cards", include_in_schema=False)
     def serve_cards_view():
+        return FileResponse(FRONTEND_SRC_DIR / "index.html")
+
+    @app.get("/index.html", include_in_schema=False)
+    def serve_index_html_view():
         return FileResponse(FRONTEND_SRC_DIR / "index.html")
 
     @app.get("/favicon.ico", include_in_schema=False)

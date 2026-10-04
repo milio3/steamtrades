@@ -1,12 +1,12 @@
 services:
-  backend:
+  app:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: steamtrades-backend
+    container_name: steamtrades-app
     restart: unless-stopped
     ports:
-      - "${BACKEND_PORT:-8334}:8000"
+      - "${PORT:-8333}:8000"
     volumes:
       - ${DATA_PATH:-/mnt/dietpi_userdata/apps/steamtrades/data}:/app/data
     environment:
@@ -14,14 +14,3 @@ services:
       - DEFAULT_TF2_STEAM_PRICE=${DEFAULT_TF2_STEAM_PRICE:-2.02}
       - DEFAULT_TF2_CASH_PRICE=${DEFAULT_TF2_CASH_PRICE:-1.62}
       - DEFAULT_STEAM_FEE_PERCENT=${DEFAULT_STEAM_FEE_PERCENT:-13.03}
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: steamtrades-frontend
-    restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-8333}:80"
-    depends_on:
-      - backend
