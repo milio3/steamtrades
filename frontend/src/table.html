@@ -238,7 +238,7 @@
           <span id="modal-badge-status" class="bg-slate-800/90 backdrop-blur border border-slate-600 text-slate-200 text-xs font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1 shadow-md">
             <i class="fa-solid fa-tag text-xs text-slate-400"></i> Listado
           </span>
-          <span id="modal-badge-platform" class="hidden bg-amber-950/90 backdrop-blur border border-amber-600 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg items-center gap-1 shadow-md">
+          <span id="modal-badge-platform" class="hidden bg-cyan-950/90 backdrop-blur border border-cyan-600 text-cyan-200 text-xs font-bold px-2 py-0.5 rounded-lg items-center gap-1 shadow-md">
             <i class="fa-solid fa-gamepad text-xs"></i> <span id="modal-platform-text">STEAM</span>
           </span>
           <span id="modal-badge-delisted" class="hidden bg-amber-950/90 backdrop-blur border border-amber-600 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg items-center gap-1 shadow-md" title="Artículo de Coleccionista">
@@ -338,17 +338,17 @@
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Estado del Juego:</label>
             <select id="edit-status" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-bold text-xs focus:outline-none focus:border-blue-500">
-              <option value="listed">Listado (Disponible)</option>
+              <option value="listed">Listado</option>
               <option value="pending">En negociación</option>
               <option value="issue">Incidencia</option>
               <option value="sold">Vendido</option>
-              <option value="archived">Archivado / No disponible</option>
+              <option value="archived">Archivado</option>
             </select>
           </div>
 
-          <!-- Oferta Recibida (TF2) -->
+          <!-- Oferta Recibida -->
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Oferta Recibida (TF2):</label>
+            <label class="block text-slate-300 font-semibold mb-1">Oferta Recibida:</label>
             <input id="edit-tf2-keys" type="number" step="0.25" min="0" 
                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold text-sm focus:outline-none focus:border-amber-500">
           </div>
@@ -573,11 +573,11 @@
     <div class="max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 w-full">
         
-        <!-- 1. Juegos Disponibles (En catálogo para venta/cambio) -->
-        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Juegos disponibles en catálogo (Listados)">
+        <!-- 1. Juegos Listados (En catálogo para venta/cambio) -->
+        <div class="bg-slate-950 border border-slate-800/80 px-3.5 py-1.5 rounded-xl flex items-center justify-between shadow-sm" title="Juegos listados en catálogo">
           <div>
             <span class="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-tag text-blue-400"></i> Juegos disponibles
+              <i class="fa-solid fa-tag text-blue-400"></i> Juegos listados
             </span>
             <div class="flex items-baseline gap-1 mt-0.5 font-mono">
               <span id="stat-available-games" class="text-base font-black text-white">0</span>

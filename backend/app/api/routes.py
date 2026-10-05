@@ -65,6 +65,27 @@ sync_listed_status: Dict[str, Any] = {
     "message": "Inactivo"
 }
 
+def update_live_tf2_settings(db: Session, settings: Optional[MarketSettingsModel] = None) -> MarketSettingsModel:
+    """Actualiza la cotización en vivo de TF2 Keys (Steam y Cash) en la base de datos."""
+    if not settings:
+        settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+        if not settings:
+            settings = MarketSettingsModel()
+            db.add(settings)
+            db.commit()
+            db.refresh(settings)
+    try:
+        live_steam, live_cash = fetch_live_tf2_key_price()
+        if live_steam:
+            settings.tf2_key_steam_price = live_steam
+            settings.tf2_key_cash_price = live_cash or round(live_steam * 0.80, 2)
+            settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
+            db.commit()
+            db.refresh(settings)
+    except Exception as e:
+        print(f"Error actualizando cotización TF2: {e}")
+    return settings
+
 def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> GameOut:
     """Combina la oferta con los metadatos de su juego y calcula las métricas al vuelo."""
     game = offer.game
@@ -129,29 +150,7 @@ def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> Ga
 @router.get("/summary", response_model=MarketSummary)
 def get_summary(db: Session = Depends(get_db)):
     offers = db.query(Offer).all()
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
-    if not settings:
-        settings = MarketSettingsModel()
-        db.add(settings)
-        db.commit()
-        db.refresh(settings)
-        
-    # Si nunca se ha guardado la fecha de cotización de TF2 o está vacía, la obtenemos y persistimos
-    if not getattr(settings, "last_tf2_update", None):
-        try:
-            live_steam, live_cash = fetch_live_tf2_key_price()
-            if live_steam:
-                settings.tf2_key_steam_price = live_steam
-                settings.tf2_key_cash_price = live_cash or round(live_steam * 0.80, 2)
-                settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
-                db.commit()
-                db.refresh(settings)
-            else:
-                settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
-                db.commit()
-                db.refresh(settings)
-        except Exception:
-            pass
+    settings = update_live_tf2_settings(db)
         
     cash_rate = settings.tf2_key_cash_price or 1.60
     
@@ -515,8 +514,8 @@ def get_game_detail(game_id: str, db: Session = Depends(get_db)):
 
 @router.post("/games/{game_id}/sync", response_model=Dict[str, Any])
 def sync_single_game_prices(game_id: str, db: Session = Depends(get_db)):
-    """Consulta y sincroniza precios en vivo (Steam, GG.deals y Kinguin ROW) de un juego."""
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    """Consulta y sincroniza precios en vivo (Steam, GG.deals y Kinguin ROW) de un juego y cotización TF2."""
+    settings = update_live_tf2_settings(db)
     try:
         gid = int(game_id)
         offer = db.query(Offer).filter(Offer.id == gid).first()
@@ -537,8 +536,8 @@ def sync_single_game_prices(game_id: str, db: Session = Depends(get_db)):
 
 @router.post("/games/sync-batch", response_model=Dict[str, Any])
 def sync_batch_games_prices(payload: Dict[str, List[int]], db: Session = Depends(get_db)):
-    """Consulta y actualiza precios de una lista específica de juegos (ej. página actual)."""
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    """Consulta y actualiza precios de una lista específica de juegos y cotización TF2."""
+    settings = update_live_tf2_settings(db)
     game_ids = payload.get("ids", [])
     updated_games = []
 
@@ -573,6 +572,7 @@ def run_sync_listed_background():
     main_db = SessionLocal()
     targets = []
     try:
+        update_live_tf2_settings(main_db)
         listed_offers = (
             main_db.query(Offer)
             .filter(Offer.status == "listed")
@@ -808,13 +808,7 @@ async def run_sync_background():
     db = SessionLocal()
     
     try:
-        settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
-        live_key_price, live_cash_price = fetch_live_tf2_key_price()
-        if live_key_price and settings:
-            settings.tf2_key_steam_price = live_key_price
-            settings.tf2_key_cash_price = live_cash_price or round(live_key_price * 0.80, 2)
-            settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
-            db.commit()
+        settings = update_live_tf2_settings(db)
             
         # OPTIMIZACIÓN: Solo sincronizar juegos con ofertas activas ('pending' o 'listed')
         active_games = (

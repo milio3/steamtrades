@@ -452,6 +452,25 @@ function setupEvents() {
           const idx = allGamesList.findIndex(x => String(x.id) === String(selectedGameId));
           if (idx !== -1) allGamesList[idx] = updated;
 
+          try {
+            const resSum = await fetch('/api/summary');
+            if (resSum.ok) {
+              const summary = await resSum.json();
+              if (summary && summary.tf2_cash_price) {
+                tf2CashPrice = summary.tf2_cash_price;
+                tf2SteamPrice = summary.tf2_steam_price;
+                if (tf2LiveBadge) tf2LiveBadge.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+                if (tf2CashBadge) tf2CashBadge.textContent = `${tf2CashPrice.toFixed(2)} €`;
+                if (tf2LiveBadgeFooter) tf2LiveBadgeFooter.textContent = `${tf2SteamPrice.toFixed(2)} €`;
+                if (tf2CashBadgeFooter) tf2CashBadgeFooter.textContent = `${tf2CashPrice.toFixed(2)} €`;
+                const tf2LastUpdateEl = document.getElementById('tf2-last-update');
+                if (tf2LastUpdateEl && summary.last_tf2_update) {
+                  tf2LastUpdateEl.textContent = `(${summary.last_tf2_update})`;
+                }
+              }
+            }
+          } catch (e) {}
+
           applyCurrentTableFilter();
           renderTable();
           calculateTotals();
@@ -810,7 +829,7 @@ function getAskingPriceData(g) {
     };
   }
 
-  // 2. Si no, calcular precio orientativo sugerido según suelo de mercado / Kinguin / mínimos
+  // 2. Si no, calcular precio de salida sugerido según suelo de mercado / Kinguin / mínimos con redondeo al alza de 0.5 TF2
   const minCur = getMinCurrentPrice(g);
   const floorEur = (typeof g.floor_price_eur === 'number' && g.floor_price_eur > 0.05) 
     ? g.floor_price_eur 
@@ -819,13 +838,15 @@ function getAskingPriceData(g) {
       : (minCur < 9000 ? minCur : (typeof g.steam_store_price === 'number' ? g.steam_store_price : null)));
 
   if (floorEur !== null && floorEur > 0.05) {
-    const sugTf2 = (floorEur / tf2CashPrice);
+    const rawTf2 = (floorEur / tf2CashPrice);
+    const sugTf2 = Math.max(0.5, Math.ceil(rawTf2 * 2) / 2);
+    const sugEur = sugTf2 * tf2CashPrice;
     return {
       type: 'suggested',
       value: sugTf2,
       currency: 'TF2',
       displayTf2: sugTf2,
-      displayEur: floorEur,
+      displayEur: sugEur,
       text: `${sugTf2.toFixed(2)} TF2`
     };
   }
@@ -892,7 +913,7 @@ function renderTableHeader() {
         <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer" title="Ordenar por Suelo Mínimo">
           <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('asking_price')" class="sortable-th py-2 px-3 text-center min-w-[130px] cursor-pointer" title="Ordenar por Precio de Salida / Orientativo">
+        <th onclick="handleSortTable('asking_price')" class="sortable-th py-2 px-3 text-center min-w-[130px] cursor-pointer" title="Ordenar por Precio de Salida">
           <span class="inline-flex items-center justify-center gap-1 text-amber-300 font-bold">Precio Salida <i id="sort-icon-asking_price" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
         <th class="py-2 px-3 text-center min-w-[90px]">Acciones</th>
@@ -1143,8 +1164,8 @@ function renderTable() {
       const kUrl = game.kinguin_url || `https://www.kinguin.net/listing?active=1&hide_out_of_stock=1&phrase=${encodeURIComponent(game.name)}&platform=Steam&region=Global`;
       kinguinHtml = `
         <a href="${kUrl}" target="_blank" class="group inline-block" title="Ver en Kinguin (Clave Global/ROW)">
-          <span class="font-bold text-amber-300 text-xs block group-hover:text-amber-200 transition font-mono leading-tight">${kinguinTf2.toFixed(2)} TF2</span>
-          <span class="text-[10px] text-amber-400/90 block group-hover:text-amber-300 font-mono leading-tight">(~${game.kinguin_price_eur.toFixed(2)} €)</span>
+          <span class="font-bold text-slate-100 group-hover:text-blue-300 text-xs block transition font-mono leading-tight">${kinguinTf2.toFixed(2)} TF2</span>
+          <span class="text-[10px] text-slate-400 block group-hover:text-slate-300 font-mono leading-tight">(~${game.kinguin_price_eur.toFixed(2)} €)</span>
         </a>
       `;
     }
@@ -1227,7 +1248,7 @@ function renderTable() {
       : '';
 
     const platBadge = (game.platform && game.platform !== 'STEAM')
-      ? `<span class="text-[10px] leading-tight bg-amber-950/80 text-amber-300 border border-amber-700/60 font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-sm" title="Plataforma: ${escapeHtml(game.platform)}"><i class="fa-solid fa-gamepad text-[9px]"></i> ${escapeHtml(game.platform)}</span>`
+      ? `<span class="text-[10px] leading-tight bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1 shadow-sm" title="Plataforma: ${escapeHtml(game.platform)}"><i class="fa-solid fa-gamepad text-[9px]"></i> ${escapeHtml(game.platform)}</span>`
       : '';
 
     const buyerBadge = game.buyer_name ? `
@@ -1271,10 +1292,9 @@ function renderTable() {
         `;
       } else if (askingData.type === 'suggested') {
         askingPriceHtml = `
-          <div class="text-center font-mono cursor-pointer hover:opacity-80 transition" onclick="openEditModal('${game.id}')" title="Precio orientativo sugerido según suelo de mercado / Kinguin (~${askingData.displayEur.toFixed(2)} €). Haz clic para fijar.">
+          <div class="text-center font-mono cursor-pointer hover:opacity-80 transition" onclick="openEditModal('${game.id}')" title="Precio de salida sugerido según suelo de mercado / Kinguin (~${askingData.displayEur.toFixed(2)} €). Haz clic para fijar.">
             <span class="font-bold text-amber-300 text-xs block leading-tight">${askingData.text}</span>
             <span class="text-[10px] text-slate-400 block leading-tight">(~${askingData.displayEur.toFixed(2)} €)</span>
-            <span class="text-[9px] text-slate-500 block leading-none mt-0.5 font-sans">Orientativo</span>
           </div>
         `;
       }
@@ -1579,11 +1599,11 @@ function updateModalStatusBadge(status) {
   if (!badge) return;
 
   const statusMap = {
-    'listed': { text: 'Listado (Disponible)', icon: 'fa-solid fa-tag text-slate-300', class: 'bg-slate-800/90 border-slate-600 text-slate-200' },
+    'listed': { text: 'Listado', icon: 'fa-solid fa-tag text-slate-300', class: 'bg-slate-800/90 border-slate-600 text-slate-200' },
     'pending': { text: 'En negociación', icon: 'fa-solid fa-handshake text-purple-400', class: 'bg-purple-950/90 border-purple-700 text-purple-300' },
     'issue': { text: 'Incidencia', icon: 'fa-solid fa-circle-exclamation text-rose-400', class: 'bg-rose-950/90 border-rose-800 text-rose-300' },
     'sold': { text: 'Vendido', icon: 'fa-solid fa-check text-emerald-400', class: 'bg-emerald-950/90 border-emerald-600 text-emerald-300' },
-    'archived': { text: 'Archivado / No disponible', icon: 'fa-solid fa-box-archive text-amber-400', class: 'bg-slate-900 border-slate-700 text-slate-400' }
+    'archived': { text: 'Archivado', icon: 'fa-solid fa-box-archive text-slate-400', class: 'bg-slate-900 border-slate-700 text-slate-400' }
   };
 
   const info = statusMap[status] || statusMap['listed'];
@@ -2014,7 +2034,7 @@ function generateSteamTradesMarkdownContent() {
   listToExport.sort((a, b) => a.name.localeCompare(b.name));
 
   const includePrice = (priceFormat !== 'none');
-  const priceHeader = 'Precio Orientativo / Salida';
+  const priceHeader = 'Precio Salida';
 
   const rowsData = listToExport.map(g => {
     const gameName = g.name.trim();

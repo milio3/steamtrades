@@ -852,7 +852,7 @@ function renderGamesGrid() {
 
     const platformBadgeHtml = (game.platform && game.platform !== 'STEAM') ? `
       <div class="absolute top-1.5 left-1.5 z-10">
-        <span class="bg-amber-950/90 backdrop-blur border border-amber-600/80 text-amber-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md" title="Plataforma: ${escapeHtml(game.platform)}">
+        <span class="bg-cyan-950/90 backdrop-blur border border-cyan-600/80 text-cyan-200 text-xs font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 shadow-md" title="Plataforma: ${escapeHtml(game.platform)}">
           <i class="fa-solid fa-gamepad text-xs"></i>
           <span>${escapeHtml(game.platform)}</span>
         </span>
