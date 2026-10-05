@@ -14,20 +14,26 @@ htmlcov/
 
 # Configuración y Secretos
 .env
+.env.*
+!.env.example
 
-# Bases de Datos Persistentes (los datos no se suben a Git)
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
-*.bak
+# Catálogo local de claves privadas y bases de datos (NO SUBIR)
+data/games_db.json
 data/*.db
 data/*.db-wal
 data/*.db-shm
 data/*.sqlite
 data/*.sqlite3
 data/*.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# Herramientas y scripts de despliegue local
+/tools/
+/scripts/
+deploy_*.py
+backend/app/tools/deploy_rpi.py
 
 # Almacenamiento Efímero / Persistente
 uploads/

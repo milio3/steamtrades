@@ -47,6 +47,8 @@ def init_database():
         game_count = db.query(Game).count()
         if game_count == 0:
             json_file = DATA_DIR / "games_db.json"
+            if not json_file.exists():
+                json_file = DATA_DIR / "games_db.json.example"
             if json_file.exists():
                 with open(json_file, "r", encoding="utf-8") as f:
                     games_raw = json.load(f)

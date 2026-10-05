@@ -56,7 +56,7 @@ steamtrades/
 │   └── Dockerfile                  # Contenedor Nginx con reverse proxy
 │
 ├── data/
-│   ├── games_db.json               # Datos iniciales para sembrado automático
+│   ├── games_db.json.example       # Plantilla de ejemplo para sembrado automático
 │   └── settings.json               # Configuración inicial de cotizaciones
 │
 ├── compose.yml                     # Orquestación de servicios Docker Compose
