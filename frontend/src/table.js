@@ -177,6 +177,17 @@ async function initData() {
     updateFilterCounts();
     setTableFilter(currentTableFilter);
     calculateTotals();
+
+    // Comprobar si hay una sincronización de listados en progreso en el servidor
+    try {
+      const resSync = await fetch('/api/games/sync-listed/status');
+      if (resSync.ok) {
+        const syncState = await resSync.json();
+        if (syncState && syncState.is_syncing) {
+          startSyncListedPolling();
+        }
+      }
+    } catch (e) {}
   } catch (err) {
     console.error("Error al cargar datos de la tabla:", err);
     showToast(`Error al cargar catálogo: ${err.message}`, "error");
@@ -296,18 +307,97 @@ function setupEvents() {
     }
   });
 
-  // Botón General para Consultar Precios de la Página Visible
+  let syncListedPollingInterval = null;
+
+  function startSyncListedPolling() {
+    if (syncListedPollingInterval) return;
+
+    if (btnSyncPrices) btnSyncPrices.disabled = true;
+    if (btnSyncIcon) btnSyncIcon.classList.add('fa-spin');
+
+    syncListedPollingInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/games/sync-listed/status');
+        if (!res.ok) return;
+        const status = await res.json();
+
+        if (status.is_syncing) {
+          if (btnSyncText) {
+            btnSyncText.textContent = `Consultando (${status.current}/${status.total})...`;
+          }
+        } else {
+          clearInterval(syncListedPollingInterval);
+          syncListedPollingInterval = null;
+
+          if (btnSyncPrices) btnSyncPrices.disabled = false;
+          if (btnSyncIcon) btnSyncIcon.classList.remove('fa-spin');
+          if (btnSyncText) btnSyncText.textContent = "Consultar Precios";
+
+          if (status.updated > 0 || status.current > 0) {
+            showToast(`Precios actualizados: ${status.updated} juegos listados sincronizados.`, "success");
+            await initData();
+          } else if (status.message) {
+            showToast(status.message, "info");
+          }
+        }
+      } catch (e) {
+        console.warn("Error en polling de sync-listed:", e);
+      }
+    }, 1500);
+  }
+
+  // Botón General para Consultar Precios de Todos los Listados o Lista Filtrada
   if (btnSyncPrices) {
     btnSyncPrices.addEventListener('click', async () => {
       const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+      // Si estamos en la pestaña Listados y no hay filtro de búsqueda restrictivo:
+      // Sincronizamos TODOS los juegos listados mediante el nuevo endpoint
+      if (currentTableFilter === 'listed' && !term) {
+        btnSyncPrices.disabled = true;
+        if (btnSyncIcon) btnSyncIcon.classList.add('fa-spin');
+        if (btnSyncText) btnSyncText.textContent = "Iniciando consulta...";
+
+        try {
+          const res = await fetch('/api/games/sync-listed', { method: 'POST' });
+          const data = await res.json();
+          if (res.ok) {
+            if (data.status === 'started' || data.status === 'already_running') {
+              showToast(data.message || "Consultando cotizaciones de todos los listados...", "info");
+              startSyncListedPolling();
+            } else if (data.status === 'completed') {
+              showToast(data.message || "Precios actualizados.", "success");
+              await initData();
+            } else {
+              showToast(data.message || "No hay juegos listados para sincronizar.", "info");
+              btnSyncPrices.disabled = false;
+              if (btnSyncIcon) btnSyncIcon.classList.remove('fa-spin');
+              if (btnSyncText) btnSyncText.textContent = "Consultar Precios";
+            }
+          } else {
+            showToast("Error al iniciar consulta de precios.", "error");
+            btnSyncPrices.disabled = false;
+            if (btnSyncIcon) btnSyncIcon.classList.remove('fa-spin');
+            if (btnSyncText) btnSyncText.textContent = "Consultar Precios";
+          }
+        } catch (err) {
+          console.error("Error al iniciar sincronización:", err);
+          showToast("Error de conexión al consultar precios.", "error");
+          btnSyncPrices.disabled = false;
+          if (btnSyncIcon) btnSyncIcon.classList.remove('fa-spin');
+          if (btnSyncText) btnSyncText.textContent = "Consultar Precios";
+        }
+        return;
+      }
+
+      // Si el usuario está buscando por texto o está en otro filtro:
+      // Consultamos TODOS los juegos coincidentes de la lista completa (no solo la primera página)
       let list = [...games];
       if (term) list = list.filter(g => g.name.toLowerCase().includes(term));
-      const startIdx = (currentPage - 1) * PAGE_SIZE;
-      const pageItems = list.slice(startIdx, startIdx + PAGE_SIZE);
-      const idsToSync = pageItems.map(g => g.id);
+      const idsToSync = list.map(g => g.id);
 
       if (idsToSync.length === 0) {
-        showToast("No hay juegos visibles para consultar precios.", "info");
+        showToast("No hay juegos para consultar precios.", "info");
         return;
       }
 

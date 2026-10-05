@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Dict, Any
@@ -49,6 +50,18 @@ sync_status = {
     "is_syncing": False,
     "current": 0,
     "total": 0,
+    "message": "Inactivo"
+}
+
+sync_listed_status: Dict[str, Any] = {
+    "is_syncing": False,
+    "total": 0,
+    "current": 0,
+    "updated": 0,
+    "errors": 0,
+    "current_game": "",
+    "started_at": None,
+    "finished_at": None,
     "message": "Inactivo"
 }
 
@@ -542,6 +555,154 @@ def sync_batch_games_prices(payload: Dict[str, List[int]], db: Session = Depends
 
     db.commit()
     return {"status": "ok", "updated_count": len(updated_games), "games": updated_games}
+
+
+def run_sync_listed_background():
+    global sync_listed_status
+    from backend.app.db.session import SessionLocal
+
+    sync_listed_status["is_syncing"] = True
+    sync_listed_status["current"] = 0
+    sync_listed_status["updated"] = 0
+    sync_listed_status["errors"] = 0
+    sync_listed_status["current_game"] = ""
+    sync_listed_status["started_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sync_listed_status["finished_at"] = None
+    sync_listed_status["message"] = "Iniciando consulta de todos los listados..."
+
+    main_db = SessionLocal()
+    targets = []
+    try:
+        listed_offers = (
+            main_db.query(Offer)
+            .filter(Offer.status == "listed")
+            .all()
+        )
+        seen = set()
+        for o in listed_offers:
+            key = (o.app_id, o.bundle)
+            if key not in seen:
+                seen.add(key)
+                targets.append(key)
+
+        total = len(targets)
+        sync_listed_status["total"] = total
+        sync_listed_status["message"] = f"Iniciando escaneo de {total} juegos listados..."
+    except Exception as e:
+        sync_listed_status["message"] = f"Error al leer ofertas listadas: {str(e)}"
+        sync_listed_status["is_syncing"] = False
+        return
+    finally:
+        main_db.close()
+
+    if total == 0:
+        sync_listed_status["is_syncing"] = False
+        sync_listed_status["message"] = "No hay juegos listados para sincronizar."
+        sync_listed_status["finished_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return
+
+    def worker_sync_game(item):
+        app_id, bundle = item
+        db_thread = SessionLocal()
+        try:
+            game = db_thread.query(Game).filter(Game.app_id == app_id, Game.bundle == bundle).first()
+            if game:
+                settings = db_thread.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+                sync_single_game(game, settings)
+                db_thread.commit()
+                return (True, game.name)
+            return (False, f"AppID {app_id}")
+        except Exception as e:
+            db_thread.rollback()
+            return (False, str(e))
+        finally:
+            db_thread.close()
+
+    try:
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_item = {executor.submit(worker_sync_game, t): t for t in targets}
+            for fut in concurrent.futures.as_completed(future_to_item):
+                sync_listed_status["current"] += 1
+                try:
+                    success, name_or_err = fut.result()
+                    if success:
+                        sync_listed_status["updated"] += 1
+                        sync_listed_status["current_game"] = name_or_err
+                    else:
+                        sync_listed_status["errors"] += 1
+                except Exception:
+                    sync_listed_status["errors"] += 1
+
+                pct = round((sync_listed_status["current"] / total) * 100, 1) if total > 0 else 100
+                sync_listed_status["message"] = f"Sincronizados {sync_listed_status['current']}/{total} ({pct}%)"
+        sync_listed_status["message"] = (
+            f"Sincronización completada: {sync_listed_status['updated']} juegos listados actualizados "
+            f"({sync_listed_status['errors']} incidencias)."
+        )
+    except Exception as e:
+        sync_listed_status["message"] = f"Error durante la sincronización: {str(e)}"
+    finally:
+        sync_listed_status["is_syncing"] = False
+        sync_listed_status["finished_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+@router.post("/games/sync-listed", response_model=Dict[str, Any])
+@router.post("/sync/listed", response_model=Dict[str, Any])
+def sync_listed_games_prices(
+    background_tasks: BackgroundTasks,
+    wait: bool = False,
+    db: Session = Depends(get_db)
+):
+    """Consulta y sincroniza precios de TODOS los juegos listados en catálogo (status == 'listed')."""
+    global sync_listed_status
+    if sync_listed_status["is_syncing"]:
+        return {
+            "status": "already_running",
+            "message": "Ya hay una sincronización de juegos listados en curso.",
+            "progress": sync_listed_status
+        }
+
+    total_listed = db.query(Offer).filter(Offer.status == "listed").count()
+    if total_listed == 0:
+        return {
+            "status": "ok",
+            "message": "No hay juegos listados para sincronizar.",
+            "total_listed": 0,
+            "progress": sync_listed_status
+        }
+
+    if wait:
+        run_sync_listed_background()
+        return {
+            "status": "completed",
+            "message": sync_listed_status["message"],
+            "progress": sync_listed_status
+        }
+    else:
+        background_tasks.add_task(run_sync_listed_background)
+        return {
+            "status": "started",
+            "message": f"Sincronización de {total_listed} juegos listados iniciada en segundo plano.",
+            "total_listed": total_listed,
+            "progress_url": "/api/games/sync-listed/status",
+            "progress": sync_listed_status
+        }
+
+
+@router.get("/games/sync-listed/status", response_model=Dict[str, Any])
+@router.get("/sync/listed/status", response_model=Dict[str, Any])
+def get_sync_listed_status():
+    """Devuelve el progreso y estado en tiempo real de la sincronización de todos los juegos listados."""
+    global sync_listed_status
+    pct = 0.0
+    if sync_listed_status["total"] > 0:
+        pct = round((sync_listed_status["current"] / sync_listed_status["total"]) * 100, 1)
+
+    return {
+        **sync_listed_status,
+        "percent": pct
+    }
+
 
 @router.delete("/games/{game_id}", response_model=Dict[str, Any])
 def delete_game(game_id: str, db: Session = Depends(get_db)):

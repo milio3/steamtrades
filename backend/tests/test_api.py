@@ -426,4 +426,25 @@ def test_add_game_by_name_and_kinguin_presence(client):
         client.delete(f"/api/games/{offer_id}")
 
 
+def test_sync_listed_status_endpoint(client):
+    response = client.get("/api/games/sync-listed/status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "is_syncing" in data
+    assert "total" in data
+    assert "current" in data
+    assert "percent" in data
+    assert "message" in data
 
+
+def test_sync_listed_endpoint(client):
+    response = client.post("/api/games/sync-listed")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] in ["started", "already_running", "ok"]
+    if data["status"] == "started":
+        assert "progress_url" in data
+        assert "total_listed" in data
+
+    res_alias = client.get("/api/sync/listed/status")
+    assert res_alias.status_code == 200
