@@ -4,7 +4,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from backend.app.db.session import get_db
 from backend.app.models.game import Game
 from backend.app.models.offer import Offer
@@ -69,8 +69,8 @@ sync_listed_status: Dict[str, Any] = {
     "message": "Inactivo"
 }
 
-def update_live_tf2_settings(db: Session, settings: Optional[MarketSettingsModel] = None) -> MarketSettingsModel:
-    """Actualiza la cotización en vivo de TF2 Keys (Steam y Cash) en la base de datos."""
+def update_live_tf2_settings(db: Session, settings: Optional[MarketSettingsModel] = None, force: bool = False) -> MarketSettingsModel:
+    """Obtiene o actualiza la cotización de TF2 Keys (Steam y Cash) en la base de datos de forma no bloqueante."""
     if not settings:
         settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
         if not settings:
@@ -78,16 +78,19 @@ def update_live_tf2_settings(db: Session, settings: Optional[MarketSettingsModel
             db.add(settings)
             db.commit()
             db.refresh(settings)
-    try:
-        live_steam, live_cash = fetch_live_tf2_key_price()
-        if live_steam:
-            settings.tf2_key_steam_price = live_steam
-            settings.tf2_key_cash_price = live_cash or round(live_steam * 0.80, 2)
-            settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
-            db.commit()
-            db.refresh(settings)
-    except Exception as e:
-        print(f"Error actualizando cotización TF2: {e}")
+
+    # Solo consultar la red externa de Steam si se solicita explícitamente (force=True) o si no hay cotización previa
+    if force or not settings.tf2_key_steam_price:
+        try:
+            live_steam, live_cash = fetch_live_tf2_key_price()
+            if live_steam:
+                settings.tf2_key_steam_price = live_steam
+                settings.tf2_key_cash_price = live_cash or round(live_steam * 0.80, 2)
+                settings.last_tf2_update = datetime.now().strftime("%d/%m/%Y %H:%M")
+                db.commit()
+                db.refresh(settings)
+        except Exception as e:
+            print(f"Error actualizando cotización TF2: {e}")
     return settings
 
 def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> GameOut:
@@ -153,8 +156,8 @@ def build_offer_out(offer: Offer, settings: Optional[MarketSettingsModel]) -> Ga
 
 @router.get("/summary", response_model=MarketSummary)
 def get_summary(db: Session = Depends(get_db)):
-    offers = db.query(Offer).all()
-    settings = update_live_tf2_settings(db)
+    settings = update_live_tf2_settings(db, force=False)
+    offers = db.query(Offer).options(joinedload(Offer.game)).all()
         
     cash_rate = settings.tf2_key_cash_price or 1.60
     
@@ -254,8 +257,8 @@ def get_games(
     sort_by: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
-    query = db.query(Offer).join(Game)
+    settings = update_live_tf2_settings(db, force=False)
+    query = db.query(Offer).options(joinedload(Offer.game)).join(Game)
     
     if search:
         s = f"%{search.lower()}%"
@@ -557,12 +560,12 @@ def import_csv_games(payload: CsvImportPayload, db: Session = Depends(get_db)):
 
 @router.get("/games/{game_id}", response_model=GameOut)
 def get_game_detail(game_id: str, db: Session = Depends(get_db)):
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    settings = update_live_tf2_settings(db, force=False)
     try:
         gid = int(game_id)
-        offer = db.query(Offer).filter(Offer.id == gid).first()
+        offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.id == gid).first()
         if not offer:
-            offer = db.query(Offer).filter(Offer.app_id == gid).first()
+            offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.app_id == gid).first()
     except ValueError:
         offer = None
         
@@ -784,12 +787,12 @@ def delete_game(game_id: str, db: Session = Depends(get_db)):
 @router.post("/games/{game_id}", response_model=Dict[str, Any])
 @router.post("/games/{game_id}/update", response_model=Dict[str, Any])
 def update_game(game_id: str, payload: GameUpdatePayload, db: Session = Depends(get_db)):
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    settings = update_live_tf2_settings(db, force=False)
     try:
         gid = int(game_id)
-        offer = db.query(Offer).filter(Offer.id == gid).first()
+        offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.id == gid).first()
         if not offer:
-            offer = db.query(Offer).filter(Offer.app_id == gid).first()
+            offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.app_id == gid).first()
     except ValueError:
         offer = None
         

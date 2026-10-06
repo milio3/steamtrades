@@ -110,8 +110,7 @@ function formatPlayersCount(num) {
 // Inicialización
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  await loadSummary();
-  await loadGames();
+  await Promise.all([loadSummary(), loadGames()]);
   checkSyncStatusLoop();
 });
 

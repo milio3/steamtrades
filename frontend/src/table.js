@@ -120,9 +120,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initData() {
   try {
-    try {
-      const resSummary = await fetch('/api/summary');
-      if (resSummary.ok) {
+    const [resSummary, resGames] = await Promise.all([
+      fetch('/api/summary').catch(err => {
+        console.warn("No se pudo cargar /api/summary:", err);
+        return null;
+      }),
+      fetch('/api/games')
+    ]);
+
+    if (resSummary && resSummary.ok) {
+      try {
         const summary = await resSummary.json();
         if (summary && summary.tf2_cash_price) {
           tf2CashPrice = summary.tf2_cash_price;
@@ -141,14 +148,13 @@ async function initData() {
             }
           }
         }
+      } catch (errSum) {
+        console.warn("Error parseando /api/summary:", errSum);
       }
-    } catch (errSum) {
-      console.warn("No se pudo cargar /api/summary:", errSum);
     }
 
-    const resGames = await fetch('/api/games');
-    if (!resGames.ok) {
-      throw new Error(`Error en API /api/games: HTTP ${resGames.status}`);
+    if (!resGames || !resGames.ok) {
+      throw new Error(`Error en API /api/games: HTTP ${resGames ? resGames.status : 'desconocido'}`);
     }
     const data = await resGames.json();
     allGamesList = Array.isArray(data) ? data : [];
@@ -2403,6 +2409,16 @@ async function handleAcceptOffer(gameId) {
   const offerVal = game.offer_price !== undefined && game.offer_price !== null ? Number(game.offer_price) : Number(game.tf2_keys_offered || 0);
   const offerCurr = game.offer_currency || 'TF2';
 
+  // Actualización optimista inmediata en memoria para respuesta instantánea
+  game.status = 'sold';
+  game.is_sold = true;
+  game.sold_price = offerVal;
+  game.sold_currency = offerCurr;
+  updateFilterCounts();
+  applyCurrentTableFilter();
+  renderTable();
+  calculateTotals();
+
   try {
     const res = await fetch(`/api/games/${gameId}`, {
       method: 'POST',
@@ -2418,13 +2434,16 @@ async function handleAcceptOffer(gameId) {
 
     if (res.ok) {
       showToast(`¡Oferta para "${game.name}" aceptada! Trasladado a Vendidos.`, "success");
-      await initData();
+      // Sincronizar en background
+      initData();
     } else {
       showToast("Error al aceptar la oferta.", "error");
+      await initData();
     }
   } catch (err) {
     console.error("Error accepting offer", err);
     showToast("Error de conexión al aceptar la oferta.", "error");
+    await initData();
   }
 }
 
@@ -2435,6 +2454,17 @@ async function handleDiscardOffer(gameId) {
   if (!confirm(`¿Estás seguro de que deseas descartar la oferta para "${game.name}" y devolver el juego a Listados?`)) {
     return;
   }
+
+  // Actualización optimista inmediata en memoria para respuesta instantánea
+  game.status = 'listed';
+  game.is_sold = false;
+  game.offer_price = 0.0;
+  game.counter_price = 0.0;
+  game.buyer_name = null;
+  updateFilterCounts();
+  applyCurrentTableFilter();
+  renderTable();
+  calculateTotals();
 
   try {
     const res = await fetch(`/api/games/${gameId}`, {
@@ -2453,13 +2483,16 @@ async function handleDiscardOffer(gameId) {
 
     if (res.ok) {
       showToast(`Oferta para "${game.name}" descartada. Devuelto a Listados.`, "info");
-      await initData();
+      // Sincronizar en background
+      initData();
     } else {
       showToast("Error al descartar la oferta.", "error");
+      await initData();
     }
   } catch (err) {
     console.error("Error discarding offer", err);
     showToast("Error de conexión al descartar la oferta.", "error");
+    await initData();
   }
 }
 
