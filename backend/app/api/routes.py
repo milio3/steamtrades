@@ -46,6 +46,10 @@ router = APIRouter(prefix="/api", tags=["Steam Keys"])
 def api_health_check():
     return {"status": "ok"}
 
+@router.get("/version", tags=["Health"])
+def api_version():
+    return {"version": "2.1.0"}
+
 sync_status = {
     "is_syncing": False,
     "current": 0,
