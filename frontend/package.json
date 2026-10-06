@@ -1,6 +1,6 @@
 {
   "name": "steamtrades-frontend",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Frontend estático para Steam Trades & Keys Valuation",
   "scripts": {
     "dev": "python -m http.server 3000 --directory src"

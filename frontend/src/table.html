@@ -11,7 +11,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <link rel="stylesheet" href="/static/styles.css?v=2.1.1">
+  <link rel="stylesheet" href="/static/styles.css?v=2.1.2">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-slate-700 selection:text-white pb-28">
 
@@ -32,13 +32,13 @@
             <h1 class="text-xl font-black tracking-tight text-white flex items-center leading-tight">
               Steam<span class="text-amber-400 ml-0.5">Trades</span>
             </h1>
-            <span class="px-1.5 py-0.5 text-[10px] font-bold font-mono bg-slate-800 text-amber-400 border border-slate-700/80 rounded-md shadow-sm">v2.1.1</span>
+            <span class="px-1.5 py-0.5 text-[10px] font-bold font-mono bg-slate-800 text-amber-400 border border-slate-700/80 rounded-md shadow-sm">v2.1.2</span>
           </div>
           <p class="text-xs text-slate-400">Análisis de ofertas, rentabilidad y generador de contraofertas</p>
         </div>
       </div>
 
-      <!-- Cotizaciones Oficiales de TF2 Keys en Cabecera -->
+      <!-- Cotizaciones Oficiales de TF2 Keys & Botón Consultar Precios en Cabecera -->
       <div class="flex items-center gap-2.5 text-xs">
         <div class="bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl flex items-center gap-2 shadow-sm" title="Cotización oficial de TF2 Key en Steam Community Market">
           <span class="text-slate-400 font-medium flex items-center gap-1.5">
@@ -52,9 +52,10 @@
           </span>
           <span id="tf2-cash-badge" class="font-bold text-emerald-400 font-mono">1.62 €</span>
         </div>
-        <button id="btn-open-add-modal" class="h-[34px] px-3.5 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer ml-1">
-          <i class="fa-solid fa-plus text-blue-400 text-xs"></i>
-          <span>Añadir Juego</span>
+        <!-- Botón Consultar Precios de Todos los Juegos Listados -->
+        <button id="btn-sync-prices" type="button" class="h-[34px] px-3.5 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer ml-1" title="Consultar y actualizar cotizaciones de Steam, GG.deals y Kinguin de todos los juegos listados">
+          <i id="btn-sync-icon" class="fa-solid fa-arrows-rotate text-blue-400 text-xs"></i>
+          <span id="btn-sync-text">Consultar Precios</span>
         </button>
       </div>
     </div>
@@ -63,64 +64,64 @@
   <!-- Contenido Principal -->
   <main class="max-w-[1780px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex-1 flex flex-col gap-3.5">
     
-    <!-- Barra de Control y Filtros de la Tabla -->
-    <div class="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex flex-wrap items-center justify-between gap-3">
-      <!-- Buscador y Filtros -->
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <div class="relative w-full sm:w-64">
+    <!-- Barra de Control y Filtros de la Tabla (100% en Una Sola Fila) -->
+    <div class="bg-slate-900 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between gap-3 overflow-x-auto whitespace-nowrap">
+      <!-- Sección Izquierda: Buscador y Filtros -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="relative w-44 sm:w-52 lg:w-56 flex-shrink-0">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
           <input id="search-table-input" type="text" placeholder="Buscar juego en la tabla..." 
-                 class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-slate-500 transition">
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-slate-500 transition">
         </div>
 
         <!-- Filtros de Estado de la Tabla -->
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <button id="filter-table-listed" class="filter-table-btn active px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Juegos listados disponibles en catálogo">
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="filter-table-listed" class="filter-table-btn active px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm flex-shrink-0" title="Juegos listados disponibles en catálogo">
             <i class="fa-solid fa-tag"></i> Listados (<span id="count-table-listed">0</span>)
           </button>
-          <button id="filter-table-pending" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos con oferta recibida y en trámite de negociación">
+          <button id="filter-table-pending" class="filter-table-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75 flex-shrink-0" title="Juegos con oferta recibida y en trámite de negociación">
             <i class="fa-solid fa-handshake"></i> En negociación (<span id="count-table-pending">0</span>)
           </button>
-          <button id="filter-table-issue" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos fuera de stock o con incidencias">
+          <button id="filter-table-issue" class="filter-table-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75 flex-shrink-0" title="Juegos fuera de stock o con incidencias">
             <i class="fa-solid fa-circle-exclamation"></i> Incidencias (<span id="count-table-issue">0</span>)
           </button>
-          <button id="filter-table-sold" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos vendidos">
+          <button id="filter-table-sold" class="filter-table-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75 flex-shrink-0" title="Juegos vendidos">
             <i class="fa-solid fa-circle-check"></i> Vendidos (<span id="count-table-sold">0</span>)
           </button>
-          <button id="filter-table-archived" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Claves archivadas / no disponibles">
+          <button id="filter-table-archived" class="filter-table-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75 flex-shrink-0" title="Claves archivadas / no disponibles">
             <i class="fa-solid fa-box-archive"></i> Archivados (<span id="count-table-archived">0</span>)
           </button>
-          <button id="filter-table-delisted" class="filter-table-btn px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75" title="Juegos retirados de Steam (Coleccionista)">
+          <button id="filter-table-delisted" class="filter-table-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm opacity-75 flex-shrink-0" title="Juegos retirados de Steam (Coleccionista)">
             <i class="fa-solid fa-crown"></i> Coleccionista (<span id="count-table-delisted">0</span>)
           </button>
         </div>
       </div>
 
-      <!-- Sección Derecha: Consultar Precios, Importar CSV y Exportar CSV -->
-      <div class="flex items-center gap-2 ml-auto flex-wrap">
+      <!-- Sección Derecha: Añadir Juego, Tabla SteamTrades, Importar CSV y Exportar CSV -->
+      <div class="flex items-center gap-2 flex-shrink-0 ml-auto">
         <!-- Input de archivo CSV oculto para Importación -->
         <input type="file" id="input-csv-import" accept=".csv" class="hidden">
 
-        <!-- Botón Consultar Precios de Todos los Juegos Listados -->
-        <button id="btn-sync-prices" type="button" class="h-[34px] px-3.5 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Consultar y actualizar cotizaciones de Steam, GG.deals y Kinguin de todos los juegos listados">
-          <i id="btn-sync-icon" class="fa-solid fa-arrows-rotate text-blue-400 text-xs"></i>
-          <span id="btn-sync-text">Consultar Precios</span>
+        <!-- Botón Añadir Juego -->
+        <button id="btn-open-add-modal" type="button" class="h-[34px] px-3 py-1.5 bg-blue-950/40 hover:bg-blue-900/60 text-blue-200 border border-blue-600/70 hover:border-blue-500 rounded-xl font-bold text-xs flex items-center gap-1.5 transition shadow-sm flex-shrink-0 cursor-pointer" title="Añadir un nuevo juego al catálogo">
+          <i class="fa-solid fa-plus text-blue-400 text-xs"></i>
+          <span>Añadir Juego</span>
         </button>
 
         <!-- Botón Generador de Tabla SteamTrades -->
-        <button id="btn-steamtrades-table" type="button" class="h-[34px] px-3.5 py-1.5 bg-gradient-to-r from-amber-950/60 to-slate-900 hover:from-amber-900/80 text-amber-200 border border-amber-600/70 hover:border-amber-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Generar tabla formateada para copiar y publicar en SteamTrades">
+        <button id="btn-steamtrades-table" type="button" class="h-[34px] px-3 py-1.5 bg-gradient-to-r from-amber-950/60 to-slate-900 hover:from-amber-900/80 text-amber-200 border border-amber-600/70 hover:border-amber-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Generar tabla formateada para copiar y publicar en SteamTrades">
           <i class="fa-solid fa-table-list text-amber-400 text-xs"></i>
           <span>Tabla SteamTrades</span>
         </button>
 
         <!-- Botón Importar CSV (Tono Verde Esmeralda Suave) -->
-        <button id="btn-import-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-200 border border-emerald-600/70 hover:border-emerald-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Cargar y aplicar datos, contraofertas y estados desde un archivo CSV">
+        <button id="btn-import-csv" type="button" class="h-[34px] px-3 py-1.5 bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-200 border border-emerald-600/70 hover:border-emerald-500 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Cargar y aplicar datos, contraofertas y estados desde un archivo CSV">
           <i class="fa-solid fa-file-import text-emerald-400 text-xs"></i>
           <span>Importar CSV</span>
         </button>
 
         <!-- Botón Exportar CSV (Tono Azul Suave) -->
-        <button id="btn-export-csv" type="button" class="h-[34px] px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Descargar plantilla CSV con la lista de juegos y contraofertas">
+        <button id="btn-export-csv" type="button" class="h-[34px] px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl font-bold text-xs transition flex items-center gap-1.5 shadow-sm flex-shrink-0 cursor-pointer" title="Descargar plantilla CSV con la lista de juegos y contraofertas">
           <i class="fa-solid fa-file-export text-slate-400 text-xs"></i>
           <span>Exportar CSV</span>
         </button>
@@ -658,6 +659,6 @@
     </div>
   </div>
 
-  <script src="/static/table.js?v=2.1.1"></script>
+  <script src="/static/table.js?v=2.1.2"></script>
 </body>
 </html>

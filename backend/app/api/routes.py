@@ -48,7 +48,7 @@ def api_health_check():
 
 @router.get("/version", tags=["Health"])
 def api_version():
-    return {"version": "2.1.1"}
+    return {"version": "2.1.2"}
 
 sync_status = {
     "is_syncing": False,
