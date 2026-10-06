@@ -70,7 +70,7 @@ def test_api_health_check(client):
 def test_api_version(client):
     response = client.get("/api/version")
     assert response.status_code == 200
-    assert response.json() == {"version": "2.1.0"}
+    assert response.json() == {"version": "2.1.1"}
 
 def test_get_summary(client):
     response = client.get("/api/summary")

@@ -48,7 +48,7 @@ def api_health_check():
 
 @router.get("/version", tags=["Health"])
 def api_version():
-    return {"version": "2.1.0"}
+    return {"version": "2.1.1"}
 
 sync_status = {
     "is_syncing": False,
@@ -454,19 +454,40 @@ def bulk_update_state(payload: BulkStatePayload, db: Session = Depends(get_db)):
 
 @router.post("/games/import-csv")
 def import_csv_games(payload: CsvImportPayload, db: Session = Depends(get_db)):
+    import hashlib
     updated_count = 0
-    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    settings = update_live_tf2_settings(db, force=False)
     
     for row in payload.rows:
         try:
             offer = None
             if row.game_id:
-                offer = db.query(Offer).filter(Offer.id == row.game_id).first()
+                offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.id == row.game_id).first()
                 if not offer:
-                    offer = db.query(Offer).filter(Offer.app_id == row.game_id).first()
+                    offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.app_id == row.game_id).first()
+                    
             if not offer and row.game_name and row.game_name.strip():
                 clean_name = row.game_name.strip()
-                offer = db.query(Offer).join(Game).filter(Game.name.ilike(clean_name)).first()
+                # 1. Coincidencia exacta (case-insensitive)
+                offer = db.query(Offer).options(joinedload(Offer.game)).join(Game).filter(Game.name.ilike(clean_name)).first()
+                # 2. Coincidencia parcial si no hay exacta
+                if not offer:
+                    offer = db.query(Offer).options(joinedload(Offer.game)).join(Game).filter(Game.name.ilike(f"%{clean_name}%")).first()
+                if not offer:
+                    # 3. Buscar si el Game existe para enlazarle su Offer
+                    game_found = db.query(Game).filter(Game.name.ilike(clean_name)).first()
+                    if not game_found:
+                        game_found = db.query(Game).filter(Game.name.ilike(f"%{clean_name}%")).first()
+                    if game_found:
+                        offer = db.query(Offer).options(joinedload(Offer.game)).filter(Offer.app_id == game_found.app_id).first()
+                        if not offer:
+                            offer = Offer(
+                                app_id=game_found.app_id,
+                                bundle=game_found.bundle or "",
+                                status="pending"
+                            )
+                            db.add(offer)
+                            db.flush()
             
             offer_currency = (row.currency or row.sold_currency or "TF2").strip().upper()
             offer_val = float(row.offer) if (row.offer is not None and row.offer >= 0) else 0.0
@@ -507,6 +528,8 @@ def import_csv_games(payload: CsvImportPayload, db: Session = Depends(get_db)):
                 if row.game_name and row.game_name.strip():
                     clean_name = row.game_name.strip()
                     game = db.query(Game).filter(Game.name.ilike(clean_name)).first()
+                    if not game:
+                        game = db.query(Game).filter(Game.name.ilike(f"%{clean_name}%")).first()
                     
                     if not game:
                         found = search_steam_games(clean_name, limit=1)
@@ -530,8 +553,8 @@ def import_csv_games(payload: CsvImportPayload, db: Session = Depends(get_db)):
                                 db.flush()
                                 sync_single_game(game, settings)
                         else:
-                            # ID sintético si no está en Steam
-                            synthetic_id = abs(hash(clean_name)) % 100000000
+                            # ID sintético determinista mediante hash MD5
+                            synthetic_id = int(hashlib.md5(clean_name.lower().encode('utf-8')).hexdigest()[:7], 16)
                             game = Game(
                                 app_id=synthetic_id,
                                 name=clean_name,
