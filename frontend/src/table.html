@@ -198,7 +198,7 @@
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Oferta Inicial (TF2):</label>
-            <input id="input-tf2-keys" type="number" step="0.25" min="0" placeholder="0.00 (Opcional)" 
+            <input id="input-tf2-keys" type="number" step="any" min="0" placeholder="0.00 (Opcional)" 
                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-slate-500">
           </div>
           <div>
@@ -349,7 +349,7 @@
           <!-- Oferta Recibida -->
           <div>
             <label class="block text-slate-300 font-semibold mb-1">Oferta Recibida:</label>
-            <input id="edit-tf2-keys" type="number" step="0.25" min="0" 
+            <input id="edit-tf2-keys" type="number" step="any" min="0" 
                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-amber-300 font-mono font-bold text-sm focus:outline-none focus:border-amber-500">
           </div>
 
@@ -378,7 +378,7 @@
             <div>
               <label class="block text-slate-300 font-semibold mb-1">Precio Cobrado:</label>
               <div class="flex items-center gap-1.5">
-                <input id="edit-sold-price" type="number" step="0.25" min="0" placeholder="0.00" 
+                <input id="edit-sold-price" type="number" step="any" min="0" placeholder="0.00" 
                        class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-emerald-400 font-mono font-black text-sm focus:outline-none focus:border-emerald-500">
                 <span id="edit-sold-currency-label" class="text-slate-300 font-bold text-xs flex-shrink-0">TF2</span>
               </div>
@@ -421,8 +421,8 @@
     </div>
   </div>
 
-  <!-- Modal de Confirmación de Importación CSV -->
-  <div id="modal-confirm-import-csv" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <!-- Modal de Importación de Ofertas CSV -->
+  <div id="modal-import-csv" class="fixed inset-0 bg-slate-950/85 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
     <div class="bg-slate-900 border border-slate-700 max-w-xl w-full rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] flex flex-col">
       <!-- Cabecera -->
       <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
@@ -431,61 +431,58 @@
             <i class="fa-solid fa-file-import text-sm"></i>
           </div>
           <div>
-            <h3 class="font-bold text-sm text-slate-100">Confirmar Importación de CSV</h3>
-            <p class="text-xs text-slate-400">Revisa el resumen antes de aplicar los cambios a la base de datos</p>
+            <h3 class="font-bold text-sm text-slate-100">Importar Ofertas (CSV)</h3>
+            <p class="text-xs text-slate-400">Carga ofertas masivas en la sección "En negociación"</p>
           </div>
         </div>
-        <button id="btn-close-import-modal" class="text-slate-400 hover:text-slate-200 text-lg leading-none">&times;</button>
+        <button id="btn-close-import-modal" class="text-slate-400 hover:text-slate-200 text-lg leading-none cursor-pointer">&times;</button>
       </div>
 
-      <!-- Tarjetas de Resumen Estadístico -->
-      <div class="grid grid-cols-3 gap-2.5 flex-shrink-0 text-xs">
-        <div class="bg-slate-950 border border-emerald-800/60 p-2.5 rounded-xl">
-          <div class="flex items-center justify-between">
-            <span class="text-emerald-400 font-bold flex items-center gap-1">
-              <i class="fa-solid fa-check-circle text-[10px]"></i> Vendidos
-            </span>
-            <span id="import-stat-sold-count" class="font-black text-sm text-emerald-300 font-mono">0</span>
-          </div>
-          <p class="text-[9px] text-slate-400 mt-0.5">Accepted = 1</p>
+      <!-- Zona de Descarga de Plantilla e Instrucciones -->
+      <div class="bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-3 text-xs flex-shrink-0">
+        <div class="space-y-0.5">
+          <span class="font-bold text-slate-200 flex items-center gap-1.5">
+            <i class="fa-solid fa-table text-emerald-400"></i> Formato de Campos:
+          </span>
+          <p class="text-[11px] text-slate-400 font-mono">Game;Buyer;Offer;Currency</p>
         </div>
-
-        <div class="bg-slate-950 border border-purple-800/60 p-2.5 rounded-xl">
-          <div class="flex items-center justify-between">
-            <span class="text-purple-400 font-bold flex items-center gap-1">
-              <i class="fa-solid fa-handshake text-[10px]"></i> En negociación
-            </span>
-            <span id="import-stat-pending-count" class="font-black text-sm text-purple-300 font-mono">0</span>
-          </div>
-          <p class="text-[9px] text-slate-400 mt-0.5">Accepted = 0, Rev = 1</p>
-        </div>
-
-        <div class="bg-slate-950 border border-slate-700 p-2.5 rounded-xl">
-          <div class="flex items-center justify-between">
-            <span class="text-slate-300 font-bold flex items-center gap-1">
-              <i class="fa-solid fa-tag text-[10px]"></i> Listados
-            </span>
-            <span id="import-stat-listed-count" class="font-black text-sm text-slate-200 font-mono">0</span>
-          </div>
-          <p class="text-[9px] text-slate-400 mt-0.5">Accepted = 0, Rev = 0</p>
-        </div>
+        <button id="btn-download-csv-template" type="button" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-slate-200 font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer flex-shrink-0 shadow-sm">
+          <i class="fa-solid fa-download text-emerald-400"></i>
+          <span>Descargar Plantilla</span>
+        </button>
       </div>
 
-      <!-- Lista Deslizable de Registros a Modificar -->
-      <div class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[140px] max-h-[260px] text-xs">
-        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Desglose de Registros Detectados (<span id="import-stat-total-rows">0</span>):</span>
-        <div id="import-preview-list" class="space-y-1.5 font-mono text-[11px]">
+      <!-- Selector de Archivo / Drop Area -->
+      <div id="import-dropzone" class="border-2 border-dashed border-slate-700 hover:border-emerald-500/70 bg-slate-950/50 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 flex-shrink-0">
+        <input type="file" id="input-csv-import-modal" accept=".csv" class="hidden">
+        <i class="fa-solid fa-cloud-arrow-up text-2xl text-slate-400"></i>
+        <div class="text-xs text-slate-300">
+          <span class="font-bold text-emerald-400 underline">Haz clic para seleccionar el fichero CSV</span> o arrástralo aquí
+        </div>
+        <span class="text-[10px] text-slate-500">Delimitador ';' y ',' en divisor de miles</span>
+      </div>
+
+      <!-- Sección de Vista Previa / Resumen (Oculta hasta seleccionar archivo) -->
+      <div id="import-preview-container" class="hidden flex-1 flex flex-col space-y-2.5 overflow-hidden">
+        <div class="flex items-center justify-between text-xs flex-shrink-0 border-t border-slate-800 pt-2">
+          <span class="font-bold text-slate-300">Ofertas Detectadas (<span id="import-stat-total-rows" class="text-emerald-400 font-mono">0</span>):</span>
+          <span class="text-[10px] bg-purple-950 text-purple-300 border border-purple-800/80 px-2 py-0.5 rounded-full font-bold">
+            Se cargarán en "En negociación"
+          </span>
+        </div>
+        
+        <div id="import-preview-list" class="flex-1 overflow-y-auto space-y-1.5 font-mono text-[11px] pr-1 max-h-[220px]">
           <!-- Filas generadas dinámicamente -->
         </div>
       </div>
 
       <!-- Botones de Acción -->
       <div class="pt-3 border-t border-slate-800 flex justify-end space-x-2 flex-shrink-0">
-        <button type="button" id="btn-cancel-import-csv" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold text-xs transition">
+        <button type="button" id="btn-cancel-import-csv" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold text-xs transition cursor-pointer">
           Cancelar
         </button>
-        <button type="button" id="btn-apply-import-csv" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5">
-          <i class="fa-solid fa-check"></i> Aplicar e Importar Cambios
+        <button type="button" id="btn-apply-import-csv" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer" disabled>
+          <i class="fa-solid fa-check"></i> Importar Ofertas
         </button>
       </div>
     </div>

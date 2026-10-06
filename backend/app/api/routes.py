@@ -448,48 +448,103 @@ def bulk_update_state(payload: BulkStatePayload, db: Session = Depends(get_db)):
 @router.post("/games/import-csv")
 def import_csv_games(payload: CsvImportPayload, db: Session = Depends(get_db)):
     updated_count = 0
+    settings = db.query(MarketSettingsModel).filter(MarketSettingsModel.id == 1).first()
+    
     for row in payload.rows:
         try:
-            offer = db.query(Offer).filter(Offer.id == row.game_id).first()
-            if not offer:
-                offer = db.query(Offer).filter(Offer.app_id == row.game_id).first()
-            if not offer and row.game_name:
-                offer = db.query(Offer).join(Game).filter(Game.name.ilike(row.game_name.strip())).first()
+            offer = None
+            if row.game_id:
+                offer = db.query(Offer).filter(Offer.id == row.game_id).first()
+                if not offer:
+                    offer = db.query(Offer).filter(Offer.app_id == row.game_id).first()
+            if not offer and row.game_name and row.game_name.strip():
+                clean_name = row.game_name.strip()
+                offer = db.query(Offer).join(Game).filter(Game.name.ilike(clean_name)).first()
             
-            if offer:
-                if row.buyer is not None and row.buyer.strip():
-                    offer.buyer_name = row.buyer.strip()
-                if row.offer is not None and row.offer >= 0:
-                    offer.offer_price = float(row.offer)
+            offer_currency = (row.currency or row.sold_currency or "TF2").strip().upper()
+            offer_val = float(row.offer) if (row.offer is not None and row.offer >= 0) else 0.0
+            buyer_val = row.buyer.strip() if (row.buyer and row.buyer.strip()) else None
 
-                # Caso 1: Accepted = 1 (Vendido)
+            if offer:
+                offer.buyer_name = buyer_val
+                offer.offer_price = offer_val
+                offer.offer_currency = offer_currency
+
+                # Caso 1: Aceptado explícito (Vendido)
                 if row.accepted is True:
                     offer.status = "sold"
-                    offer.sold_currency = row.sold_currency or "TF2"
+                    offer.sold_currency = row.sold_currency or offer_currency
                     inc_val = float(row.increment) if row.increment is not None else 0.0
                     offer.counter_price = inc_val
                     offer.sold_price = float(row.sold_price) if row.sold_price is not None else float(offer.offer_price + inc_val)
                     offer.sold_note = "Importado CSV"
                     offer.is_reviewed = True
-                # Caso 2: Accepted = 0 y Revised = 1 (Tramitado / Pending)
-                elif row.revised is True:
-                    offer.status = "pending"
-                    offer.is_reviewed = True
-                    offer.sold_price = None
-                    offer.sold_note = None
-                    if row.increment is not None and row.increment >= 0:
-                        offer.counter_price = float(row.increment)
-                    elif row.counter_offer is not None and row.offer is not None:
-                        offer.counter_price = max(0.0, float(row.counter_offer) - float(row.offer))
-                # Caso 3: Accepted = 0 y Revised = 0 (Listado)
-                else:
+                # Caso 2: Explícitamente marcado como no revisado ni aceptado (Listado)
+                elif row.revised is False and row.accepted is False:
                     offer.status = "listed"
                     offer.is_reviewed = False
                     offer.counter_price = 0.0
                     offer.sold_price = None
                     offer.sold_note = None
+                # Caso 3: Carga en "En negociación" (por defecto para todas las ofertas importadas)
+                else:
+                    offer.status = "pending"
+                    offer.is_reviewed = True
+                    offer.counter_price = float(row.increment) if (row.increment is not None and row.increment >= 0) else 0.0
+                    offer.sold_price = None
+                    offer.sold_note = None
                 
                 updated_count += 1
+            else:
+                # Si no hay oferta previa pero sí nombre de juego, buscamos o creamos el juego
+                if row.game_name and row.game_name.strip():
+                    clean_name = row.game_name.strip()
+                    game = db.query(Game).filter(Game.name.ilike(clean_name)).first()
+                    
+                    if not game:
+                        found = search_steam_games(clean_name, limit=1)
+                        if found:
+                            app_id = found[0]["app_id"]
+                            existing_game = db.query(Game).filter(Game.app_id == app_id).first()
+                            if existing_game:
+                                game = existing_game
+                            else:
+                                details = fetch_steam_app_details(app_id)
+                                game = Game(
+                                    app_id=app_id,
+                                    name=details.get("name") or clean_name,
+                                    header_image=details.get("header_image") or f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg",
+                                    steam_price=details.get("price"),
+                                    is_delisted=bool(details.get("is_delisted", False)),
+                                    delisted_reason=details.get("reason"),
+                                    steam_players_24h=details.get("players_24h")
+                                )
+                                db.add(game)
+                                db.flush()
+                                sync_single_game(game, settings)
+                        else:
+                            # ID sintético si no está en Steam
+                            synthetic_id = abs(hash(clean_name)) % 100000000
+                            game = Game(
+                                app_id=synthetic_id,
+                                name=clean_name,
+                                header_image=f"https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/{synthetic_id}/header.jpg"
+                            )
+                            db.add(game)
+                            db.flush()
+                    
+                    new_offer = Offer(
+                        app_id=game.app_id,
+                        bundle=game.bundle or "",
+                        buyer_name=buyer_val,
+                        offer_price=offer_val,
+                        offer_currency=offer_currency,
+                        status="pending",
+                        is_reviewed=True,
+                        counter_price=0.0
+                    )
+                    db.add(new_offer)
+                    updated_count += 1
         except Exception as e:
             print(f"Error in import_csv row {row}: {e}")
             

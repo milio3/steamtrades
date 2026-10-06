@@ -145,10 +145,11 @@ class OfferOut(BaseModel):
 GameOut = OfferOut
 
 class CsvImportRow(BaseModel):
-    game_id: int
+    game_id: Optional[int] = None
     game_name: Optional[str] = None
     buyer: Optional[str] = None
     offer: Optional[float] = None
+    currency: Optional[str] = "TF2"
     counter_offer: Optional[float] = None
     increment: Optional[float] = None
     revised: Optional[bool] = None

@@ -448,3 +448,74 @@ def test_sync_listed_endpoint(client):
 
     res_alias = client.get("/api/sync/listed/status")
     assert res_alias.status_code == 200
+
+def test_import_new_csv_offers_format(client):
+    """Verifica la importación masiva de ofertas con el formato Game;Buyer;Offer;Currency cargándolas en 'En negociación'."""
+    payload = {
+        "rows": [
+            {
+                "game_name": "Wargame: Red Dragon",
+                "buyer": "xMjalino",
+                "offer": 3.33,
+                "currency": "TF2"
+            },
+            {
+                "game_name": "Passpartout: The Starving Artist",
+                "buyer": "BuyerTest",
+                "offer": 1.75,
+                "currency": "EUR"
+            }
+        ]
+    }
+    res_import = client.post("/api/games/import-csv", json=payload)
+    assert res_import.status_code == 200
+    assert res_import.json()["status"] == "ok"
+    assert res_import.json()["updated_count"] == 2
+
+    # Consultar juegos en pending
+    res_pending = client.get("/api/games?status=pending")
+    assert res_pending.status_code == 200
+    pending_list = res_pending.json()
+
+    wargame = next((g for g in pending_list if "Wargame" in g["name"]), None)
+    assert wargame is not None
+    assert wargame["status"] == "pending"
+    assert wargame["buyer_name"] == "xMjalino"
+    assert wargame["offer_price"] == 3.33
+    assert wargame["offer_currency"] == "TF2"
+
+    passpartout = next((g for g in pending_list if "Passpartout" in g["name"]), None)
+    assert passpartout is not None
+    assert passpartout["status"] == "pending"
+    assert passpartout["buyer_name"] == "BuyerTest"
+    assert passpartout["offer_price"] == 1.75
+    assert passpartout["offer_currency"] == "EUR"
+
+    # Probar aceptar la oferta de Wargame (verde)
+    res_accept = client.post(f"/api/games/{wargame['id']}", json={
+        "status": "sold",
+        "is_sold": True,
+        "sold_price": wargame["offer_price"],
+        "sold_currency": wargame["offer_currency"],
+        "sold_note": "Oferta aceptada"
+    })
+    assert res_accept.status_code == 200
+    assert res_accept.json()["game"]["status"] == "sold"
+    assert res_accept.json()["game"]["is_sold"] is True
+
+    # Probar descartar la oferta de Passpartout (rojo -> vuelve a listed)
+    res_discard = client.post(f"/api/games/{passpartout['id']}", json={
+        "status": "listed",
+        "is_sold": False,
+        "offer_price": 0.0,
+        "counter_price": 0.0,
+        "buyer_name": None
+    })
+    assert res_discard.status_code == 200
+    assert res_discard.json()["game"]["status"] == "listed"
+    assert res_discard.json()["game"]["buyer_name"] is None
+
+    # Limpieza
+    client.delete(f"/api/games/{wargame['id']}")
+    client.delete(f"/api/games/{passpartout['id']}")
+

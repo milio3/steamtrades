@@ -79,14 +79,15 @@ const btnModalSyncPrice = document.getElementById('btn-modal-sync-price');
 const modalSyncIcon = document.getElementById('modal-sync-icon');
 const modalSyncText = document.getElementById('modal-sync-text');
 
-// Modal de Confirmación de Importación CSV
-const modalConfirmImport = document.getElementById('modal-confirm-import-csv');
+// Modal de Importación de Ofertas CSV
+const modalImportCsv = document.getElementById('modal-import-csv');
 const btnCloseImportModal = document.getElementById('btn-close-import-modal');
 const btnCancelImportCsv = document.getElementById('btn-cancel-import-csv');
 const btnApplyImportCsv = document.getElementById('btn-apply-import-csv');
-const importStatSoldCount = document.getElementById('import-stat-sold-count');
-const importStatPendingCount = document.getElementById('import-stat-pending-count');
-const importStatListedCount = document.getElementById('import-stat-listed-count');
+const btnDownloadCsvTemplate = document.getElementById('btn-download-csv-template');
+const inputCsvImportModal = document.getElementById('input-csv-import-modal');
+const importDropzone = document.getElementById('import-dropzone');
+const importPreviewContainer = document.getElementById('import-preview-container');
 const importStatTotalRows = document.getElementById('import-stat-total-rows');
 const importPreviewList = document.getElementById('import-preview-list');
 let pendingImportRows = [];
@@ -513,21 +514,41 @@ function setupEvents() {
     });
   }
 
-  if (btnImportCsv && inputCsvImport) {
-    btnImportCsv.addEventListener('click', () => {
-      inputCsvImport.value = '';
-      inputCsvImport.click();
-    });
-    inputCsvImport.addEventListener('change', handleCsvFileSelect);
+  if (btnImportCsv) {
+    btnImportCsv.addEventListener('click', openImportModal);
   }
 
-  const closeImportModal = () => {
-    if (modalConfirmImport) {
-      modalConfirmImport.classList.add('hidden');
-      modalConfirmImport.classList.remove('flex');
-    }
-    pendingImportRows = [];
-  };
+  if (btnDownloadCsvTemplate) {
+    btnDownloadCsvTemplate.addEventListener('click', downloadCsvTemplate);
+  }
+
+  if (importDropzone && inputCsvImportModal) {
+    importDropzone.addEventListener('click', () => {
+      inputCsvImportModal.value = '';
+      inputCsvImportModal.click();
+    });
+
+    importDropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      importDropzone.classList.add('border-emerald-500', 'bg-emerald-950/20');
+    });
+
+    importDropzone.addEventListener('dragleave', () => {
+      importDropzone.classList.remove('border-emerald-500', 'bg-emerald-950/20');
+    });
+
+    importDropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      importDropzone.classList.remove('border-emerald-500', 'bg-emerald-950/20');
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file) handleCsvFile(file);
+    });
+
+    inputCsvImportModal.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) handleCsvFile(file);
+    });
+  }
 
   if (btnCloseImportModal) btnCloseImportModal.addEventListener('click', closeImportModal);
   if (btnCancelImportCsv) btnCancelImportCsv.addEventListener('click', closeImportModal);
@@ -798,14 +819,11 @@ function getBalancePct(game) {
 
 function getImprovementPct(game) {
   const floorEur = (typeof game.floor_price_eur === 'number') ? game.floor_price_eur : 0;
-  const origTf2 = Number(game.tf2_keys_offered);
-  const incTf2 = getIncrease(game);
-  if (incTf2 <= 0) return 0;
-  const origCash = origTf2 * tf2CashPrice;
-  const lossEur = floorEur - origCash;
-  const incCash = incTf2 * tf2CashPrice;
-  if (lossEur > 0) return (incCash / lossEur) * 100;
-  return (incTf2 / origTf2) * 100;
+  if (floorEur <= 0) return -9999;
+  const isEur = (game.offer_currency === 'EUR');
+  const offerVal = game.offer_price !== undefined && game.offer_price !== null ? Number(game.offer_price) : Number(game.tf2_keys_offered || 0);
+  const offerValEur = isEur ? offerVal : (offerVal * tf2CashPrice);
+  return ((offerValEur - floorEur) / floorEur) * 100;
 }
 
 function getAskingPriceData(g) {
@@ -872,7 +890,7 @@ function handleSortTable(field) {
 }
 
 function updateSortIcons() {
-  const fields = ['id', 'name', 'buyer', 'players', 'min_current', 'kinguin', 'floor', 'asking_price', 'orig_tf2', 'increase', 'counter_tf2', 'balance', 'improvement'];
+  const fields = ['id', 'name', 'buyer', 'players', 'min_current', 'kinguin', 'floor', 'asking_price', 'orig_tf2', 'improvement'];
   fields.forEach(f => {
     const icon = document.getElementById(`sort-icon-${f}`);
     if (!icon) return;
@@ -925,10 +943,10 @@ function renderTableHeader() {
         <th onclick="handleSortTable('id')" class="sortable-th py-2 px-2 pl-3 w-14 text-center cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">ID <i id="sort-icon-id" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[200px] cursor-pointer">
+        <th onclick="handleSortTable('name')" class="sortable-th py-2 px-3 min-w-[220px] cursor-pointer">
           <span class="inline-flex items-center gap-1">Juego <i id="sort-icon-name" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
+        <th onclick="handleSortTable('buyer')" class="sortable-th py-2 px-3 text-center min-w-[120px] cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">Comprador <i id="sort-icon-buyer" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
         <th onclick="handleSortTable('players')" class="sortable-th py-2 px-3 text-center min-w-[100px] cursor-pointer">
@@ -937,25 +955,16 @@ function renderTableHeader() {
         <th onclick="handleSortTable('min_current')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">Mínimo Actual <i id="sort-icon-min_current" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[110px] border-r border-slate-800 cursor-pointer">
+        <th onclick="handleSortTable('floor')" class="sortable-th py-2 px-3 text-center min-w-[110px] cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">Suelo Mínimo <i id="sort-icon-floor" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('orig_tf2')" class="sortable-th py-2 px-3 text-center min-w-[105px] cursor-pointer">
+        <th onclick="handleSortTable('orig_tf2')" class="sortable-th py-2 px-3 text-center min-w-[115px] cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">Oferta Recibida <i id="sort-icon-orig_tf2" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th onclick="handleSortTable('increase')" class="sortable-th py-2 px-3 text-center min-w-[125px] border-r border-slate-800 cursor-pointer">
-          <span class="inline-flex items-center justify-center gap-1">Aumentar (TF2) <i id="sort-icon-increase" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
-        </th>
-        <th onclick="handleSortTable('counter_tf2')" class="sortable-th py-2 px-3 text-center min-w-[125px] cursor-pointer">
-          <span class="inline-flex items-center justify-center gap-1">Contraoferta TF2 <i id="sort-icon-counter_tf2" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
-        </th>
-        <th onclick="handleSortTable('balance')" class="sortable-th py-2 px-3 text-center min-w-[115px] cursor-pointer">
-          <span class="inline-flex items-center justify-center gap-1">Balance vs Suelo <i id="sort-icon-balance" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
-        </th>
-        <th onclick="handleSortTable('improvement')" class="sortable-th py-2 px-3 text-center min-w-[110px] border-r border-slate-800 cursor-pointer">
+        <th onclick="handleSortTable('improvement')" class="sortable-th py-2 px-3 text-center min-w-[130px] cursor-pointer">
           <span class="inline-flex items-center justify-center gap-1">Mejora (% Suelo) <i id="sort-icon-improvement" class="fa-solid fa-sort text-[10px] opacity-40"></i></span>
         </th>
-        <th class="py-2 px-3 text-center min-w-[80px]">Acción</th>
+        <th class="py-2 px-3 text-center min-w-[170px]">Acciones</th>
       </tr>
     `;
   } else if (currentTableFilter === 'issue') {
@@ -1309,8 +1318,57 @@ function renderTable() {
         <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
       `;
     } else if (currentTableFilter === 'pending') {
-      const inputClass = `w-16 bg-slate-950 border ${increaseTf2 > 0 ? 'border-amber-500 text-amber-200 font-bold' : 'border-slate-700 text-slate-200'} rounded-lg px-1.5 py-1 text-center font-mono text-xs focus:outline-none focus:border-blue-500 transition`;
-      const offerReceivedText = origTf2 > 0 ? `${origTf2} TF2` : '-';
+      const isEur = (game.offer_currency === 'EUR');
+      const offerVal = (game.offer_price !== undefined && game.offer_price !== null) ? Number(game.offer_price) : Number(game.tf2_keys_offered || 0);
+      const offerValEur = isEur ? offerVal : (offerVal * tf2CashPrice);
+
+      let offerReceivedHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
+      if (offerVal > 0) {
+        if (isEur) {
+          offerReceivedHtml = `
+            <span class="font-bold text-amber-300 text-xs block font-mono leading-tight">${offerVal.toFixed(2)} €</span>
+            <span class="text-[10px] text-slate-400 block font-mono leading-tight">EUR</span>
+          `;
+        } else {
+          offerReceivedHtml = `
+            <span class="font-bold text-amber-300 text-xs block font-mono leading-tight">${offerVal} TF2</span>
+            <span class="text-[10px] text-slate-400 block font-mono leading-tight">(~${offerValEur.toFixed(2)} €)</span>
+          `;
+        }
+      }
+
+      // Mejora (% suelo): % de diferencia entre la oferta y el valor de suelo
+      let improvementHtml = '<span class="text-slate-500 font-mono text-xs">-</span>';
+      if (floorPriceEur !== null && floorPriceEur > 0 && offerVal > 0) {
+        const diffEur = offerValEur - floorPriceEur;
+        const diffPct = (diffEur / floorPriceEur) * 100;
+        if (diffEur >= 0) {
+          improvementHtml = `
+            <span class="bg-emerald-950/70 text-emerald-200 border border-emerald-700/60 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+              +${diffPct.toFixed(1)}%
+            </span>
+            <span class="text-[10px] text-emerald-400 block mt-0.5 font-bold font-mono">+${diffEur.toFixed(2)}€</span>
+          `;
+        } else {
+          improvementHtml = `
+            <span class="bg-rose-950/70 text-rose-200 border border-rose-700/60 px-2 py-0.5 rounded text-[11px] font-bold inline-block font-mono">
+              ${diffPct.toFixed(1)}%
+            </span>
+            <span class="text-[10px] text-rose-300 block mt-0.5 font-bold font-mono">${diffEur.toFixed(2)}€</span>
+          `;
+        }
+      }
+
+      const pendingActionBtns = `
+        <div class="inline-flex items-center gap-1.5 justify-center">
+          <button onclick="handleAcceptOffer('${game.id}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm cursor-pointer" title="Aceptar oferta y trasladar a Vendidos">
+            <i class="fa-solid fa-check text-[10px]"></i> Aceptar
+          </button>
+          <button onclick="handleDiscardOffer('${game.id}')" class="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 border border-rose-700/80 text-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm cursor-pointer" title="Descartar oferta y devolver a Listados">
+            <i class="fa-solid fa-xmark text-[10px]"></i> Descartar
+          </button>
+        </div>
+      `;
 
       row.innerHTML = `
         <td class="py-1.5 px-2 pl-3 text-center text-slate-300 font-mono text-xs font-bold">${game.id}</td>
@@ -1318,29 +1376,10 @@ function renderTable() {
         <td class="py-1.5 px-2.5 text-center">${buyerBadge}</td>
         <td class="py-1.5 px-2.5 text-center">${playersHtml}</td>
         <td class="py-1.5 px-2.5 text-center font-mono text-xs">${minCurrentHtml}</td>
-        <td class="py-1.5 px-2.5 text-center font-mono text-xs border-r border-slate-800" title="Fuente: ${floorSource}">${floorHtml}</td>
-        <td class="py-1.5 px-2.5 text-center text-amber-300 font-mono text-xs font-bold">${offerReceivedText}</td>
-        <td class="py-1.5 px-2.5 text-center border-r border-slate-800">
-          <div class="inline-flex items-center gap-1 justify-center">
-            <span class="text-slate-400 font-bold text-xs">+</span>
-            <input type="number" step="0.25" min="0" 
-                   id="inc-input-${game.id}"
-                   value="${increaseTf2 > 0 ? increaseTf2 : ''}" 
-                   placeholder="0.00" 
-                   oninput="handleIncreaseInput('${game.id}', this.value)"
-                   class="${inputClass}">
-            <span class="text-[10px] text-slate-400 font-bold font-mono">TF2</span>
-          </div>
-        </td>
-        <td id="cell-counter-${game.id}" class="py-1.5 px-2.5 text-center font-mono">
-          <div class="flex flex-col items-center">
-            <span class="font-bold text-emerald-400 text-xs leading-tight">${effectiveTf2 > 0 ? `${effectiveTf2} TF2` : '-'}</span>
-            <span class="text-[10px] text-slate-400 leading-tight">${effectiveTf2 > 0 ? `~${effectiveCash.toFixed(2)} €` : ''}</span>
-          </div>
-        </td>
-        <td id="cell-balance-${game.id}" class="py-1.5 px-2.5 text-center font-mono">${balanceHtml}</td>
-        <td id="cell-improvement-${game.id}" class="py-1.5 px-2.5 text-center font-mono border-r border-slate-800">${improvementHtml}</td>
-        <td class="py-1.5 px-2.5 text-center">${actionBtnHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs" title="Fuente: ${floorSource}">${floorHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono text-xs">${offerReceivedHtml}</td>
+        <td class="py-1.5 px-2.5 text-center font-mono">${improvementHtml}</td>
+        <td class="py-1.5 px-2.5 text-center">${pendingActionBtns}</td>
       `;
     } else if (currentTableFilter === 'issue') {
       const issueNoteText = escapeHtml(game.issue_note || 'Agotada / Fuera de stock');
@@ -1930,16 +1969,11 @@ function exportToCsv() {
       return num.toString();
     };
 
-    // Cabeceras de la plantilla CSV
-    let csv = "GameID;Game;Bundle;Buyer;Offer;CounterOffer;AskingPrice;Increment;Revised;Accepted;SoldCurrency;SoldPrice\r\n";
+    // Cabeceras de la plantilla CSV alineadas con Game;Buyer;Offer;Currency
+    let csv = "Game;Buyer;Offer;Currency\r\n";
     
     listToExport.forEach(g => {
-      const gameId = g.id;
       const cleanName = (g.name || '')
-        .replace(/;/g, ' - ')
-        .replace(/"/g, '""')
-        .trim();
-      const cleanBundle = (g.bundle || '')
         .replace(/;/g, ' - ')
         .replace(/"/g, '""')
         .trim();
@@ -1948,25 +1982,10 @@ function exportToCsv() {
         .replace(/"/g, '""')
         .trim();
 
-      const offer = Number(g.tf2_keys_offered || g.offer_price || 0);
-      const increment = getIncrease(g);
-      const counterOffer = offer + increment;
-      const askData = getAskingPriceData(g);
-      const askingPrice = askData.type !== 'none' ? askData.displayTf2 : '';
-      const revised = g.is_reviewed ? 1 : 0;
-      const accepted = (g.is_sold || g.status === 'sold') ? 1 : 0;
-      const soldCurrency = g.sold_currency || 'TF2';
-      
-      let soldPrice = '';
-      if (accepted === 1) {
-        if (g.sold_price !== null && g.sold_price !== undefined) {
-          soldPrice = g.sold_price;
-        } else {
-          soldPrice = g.sold_tf2_keys || counterOffer;
-        }
-      }
+      const offerVal = (g.offer_price !== undefined && g.offer_price !== null) ? Number(g.offer_price) : Number(g.tf2_keys_offered || 0);
+      const currency = g.offer_currency || 'TF2';
 
-      csv += `"${gameId}";"${cleanName}";"${cleanBundle}";"${cleanBuyer}";${formatDecimal(offer)};${formatDecimal(counterOffer)};${formatDecimal(askingPrice)};${formatDecimal(increment)};${revised};${accepted};"${soldCurrency}";${formatDecimal(soldPrice)}\r\n`;
+      csv += `"${cleanName}";"${cleanBuyer}";${formatDecimal(offerVal)};"${currency}"\r\n`;
     });
 
     // BOM UTF-8 (\uFEFF) para compatibilidad nativa con Microsoft Excel en español/Windows
@@ -2175,12 +2194,76 @@ function parseCsvLine(text) {
   return row.map(s => s ? s.trim() : '');
 }
 
-async function handleCsvFileSelect(e) {
-  const file = e.target.files && e.target.files[0];
+function parseOfferNumber(val) {
+  if (val === null || val === undefined || val === '') return 0.0;
+  let s = String(val).replace(/^["']|["']$/g, '').trim();
+  if (!s) return 0.0;
+
+  // Manejar formato con comas y puntos
+  if (s.includes(',') && s.includes('.')) {
+    const firstComma = s.indexOf(',');
+    const firstDot = s.indexOf('.');
+    if (firstComma < firstDot) {
+      // Coma es separador de miles, punto es decimal (ej. 1,250.50)
+      s = s.replace(/,/g, '');
+    } else {
+      // Punto es separador de miles, coma es decimal (ej. 1.250,50)
+      s = s.replace(/\./g, '').replace(',', '.');
+    }
+  } else if (s.includes(',')) {
+    // Solo contiene comas (ej. 0,5 o 1,75 o 1,000)
+    s = s.replace(',', '.');
+  }
+
+  const num = parseFloat(s);
+  return isNaN(num) ? 0.0 : num;
+}
+
+function openImportModal() {
+  if (!modalImportCsv) return;
+  pendingImportRows = [];
+  if (inputCsvImportModal) inputCsvImportModal.value = '';
+  if (importPreviewContainer) importPreviewContainer.classList.add('hidden');
+  if (btnApplyImportCsv) {
+    btnApplyImportCsv.disabled = true;
+    btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-check"></i> Importar Ofertas`;
+  }
+  modalImportCsv.classList.remove('hidden');
+  modalImportCsv.classList.add('flex');
+}
+
+function closeImportModal() {
+  if (modalImportCsv) {
+    modalImportCsv.classList.add('hidden');
+    modalImportCsv.classList.remove('flex');
+  }
+  pendingImportRows = [];
+}
+
+function downloadCsvTemplate() {
+  const templateContent = "Game;Buyer;Offer;Currency\r\n" +
+    "Wargame: Red Dragon;xMjalino;3.0;TF2\r\n" +
+    "ONE PIECE BURNING BLOOD;xMjalino;0.5;TF2\r\n" +
+    "A Hat in Time;xMjalino;4.5;TF2\r\n" +
+    "Resident Evil 5 Gold Edition;xMjalino;1.75;TF2\r\n";
+
+  // BOM UTF-8 (\uFEFF) para compatibilidad con Excel
+  const blob = new Blob(["\uFEFF" + templateContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'plantilla_ofertas_steamtrades.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast("¡Plantilla CSV de ofertas descargada!", "success");
+}
+
+function handleCsvFile(file) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = async function(evt) {
+  reader.onload = function(evt) {
     try {
       let content = evt.target.result;
       if (content.charCodeAt(0) === 0xFEFF) {
@@ -2194,68 +2277,40 @@ async function handleCsvFileSelect(e) {
       }
 
       const headerRow = parseCsvLine(lines[0]).map(h => h.replace(/^["']|["']$/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''));
-      
-      // Encontrar índices de columnas
-      const idIdx = headerRow.findIndex(h => h.includes('gameid') || h === 'id');
-      const nameIdx = headerRow.findIndex(h => h === 'game' || h.includes('gamename') || h.includes('nombre'));
-      const buyerIdx = headerRow.findIndex(h => h.includes('buyer') || h.includes('comprador'));
-      const offerIdx = headerRow.findIndex(h => h === 'offer' || h.includes('oferta'));
-      const counterIdx = headerRow.findIndex(h => h.includes('counter') || h.includes('contraoferta'));
-      const incIdx = headerRow.findIndex(h => h.includes('increment') || h.includes('aumento'));
-      const revIdx = headerRow.findIndex(h => h.includes('revis') || h.includes('revised'));
-      const accIdx = headerRow.findIndex(h => h.includes('accept') || h.includes('sold') || h.includes('acept'));
-      const currIdx = headerRow.findIndex(h => h.includes('currec') || h.includes('curren') || h.includes('moneda') || h.includes('divisa'));
-      const priceIdx = headerRow.findIndex(h => h.includes('soldprice') || h.includes('precio'));
 
-      if (idIdx === -1 && nameIdx === -1) {
-        showToast("Formato de CSV no reconocido: falta columna GameID o Game.", "error");
+      // Detección de columnas
+      const nameIdx = headerRow.findIndex(h => h === 'game' || h.includes('gamename') || h.includes('juego') || h.includes('nombre') || h === 'title');
+      const buyerIdx = headerRow.findIndex(h => h.includes('buyer') || h.includes('comprador') || h.includes('usuario'));
+      const offerIdx = headerRow.findIndex(h => h === 'offer' || h.includes('receivedoffer') || h.includes('oferta') || h.includes('precio') || h === 'price');
+      const currIdx = headerRow.findIndex(h => h.includes('currec') || h.includes('currency') || h.includes('moneda') || h.includes('divisa'));
+      const idIdx = headerRow.findIndex(h => h.includes('gameid') || h === 'id');
+
+      if (nameIdx === -1 && idIdx === -1) {
+        showToast("Formato de CSV no reconocido: falta columna 'Game' o 'GameID'.", "error");
         return;
       }
-
-      const parseNumber = (val) => {
-        if (!val) return null;
-        const clean = val.replace(/^["']|["']$/g, '').replace(',', '.').trim();
-        const num = parseFloat(clean);
-        return isNaN(num) ? null : num;
-      };
-
-      const parseBool = (val) => {
-        if (!val) return false;
-        const clean = val.replace(/^["']|["']$/g, '').trim().toLowerCase();
-        return clean === '1' || clean === 'true' || clean === 'si' || clean === 'sí' || clean === 'yes';
-      };
 
       const rowsToImport = [];
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCsvLine(lines[i]);
         if (cols.length === 0 || !cols.some(c => c.length > 0)) continue;
 
-        const rawId = idIdx !== -1 && cols[idIdx] ? cols[idIdx].replace(/^["']|["']$/g, '').trim() : null;
+        const gameName = (nameIdx !== -1 && cols[nameIdx]) ? cols[nameIdx].replace(/^["']|["']$/g, '').trim() : '';
+        const rawId = (idIdx !== -1 && cols[idIdx]) ? cols[idIdx].replace(/^["']|["']$/g, '').trim() : null;
         const gameId = rawId ? parseInt(rawId, 10) : null;
-        const gameName = nameIdx !== -1 && cols[nameIdx] ? cols[nameIdx].replace(/^["']|["']$/g, '').trim() : null;
 
-        if (!gameId && !gameName) continue;
+        if (!gameName && !gameId) continue;
 
-        const buyer = buyerIdx !== -1 && cols[buyerIdx] ? cols[buyerIdx].replace(/^["']|["']$/g, '').trim() : null;
-        const offer = offerIdx !== -1 ? parseNumber(cols[offerIdx]) : null;
-        const counterOffer = counterIdx !== -1 ? parseNumber(cols[counterIdx]) : null;
-        const increment = incIdx !== -1 ? parseNumber(cols[incIdx]) : null;
-        const revised = revIdx !== -1 ? parseBool(cols[revIdx]) : false;
-        const accepted = accIdx !== -1 ? parseBool(cols[accIdx]) : false;
-        const soldCurrency = currIdx !== -1 && cols[currIdx] ? cols[currIdx].replace(/^["']|["']$/g, '').trim().toUpperCase() : 'TF2';
-        const soldPrice = priceIdx !== -1 ? parseNumber(cols[priceIdx]) : null;
+        const buyer = (buyerIdx !== -1 && cols[buyerIdx]) ? cols[buyerIdx].replace(/^["']|["']$/g, '').trim() : '';
+        const offerVal = offerIdx !== -1 ? parseOfferNumber(cols[offerIdx]) : 0.0;
+        const currency = (currIdx !== -1 && cols[currIdx]) ? cols[currIdx].replace(/^["']|["']$/g, '').trim().toUpperCase() : 'TF2';
 
         rowsToImport.push({
-          game_id: gameId || 0,
+          game_id: gameId || null,
           game_name: gameName,
-          buyer: buyer,
-          offer: offer,
-          counter_offer: counterOffer,
-          increment: increment,
-          revised: revised,
-          accepted: accepted,
-          sold_currency: soldCurrency,
-          sold_price: soldPrice
+          buyer: buyer || null,
+          offer: offerVal,
+          currency: currency || 'TF2'
         });
       }
 
@@ -2266,49 +2321,33 @@ async function handleCsvFileSelect(e) {
 
       pendingImportRows = rowsToImport;
 
-      // Calcular estadísticas previas
-      const soldRows = rowsToImport.filter(r => r.accepted === true);
-      const pendingRows = rowsToImport.filter(r => r.accepted === false && r.revised === true);
-      const listedRows = rowsToImport.filter(r => r.accepted === false && r.revised === false);
-
       if (importStatTotalRows) importStatTotalRows.textContent = rowsToImport.length;
-      if (importStatSoldCount) importStatSoldCount.textContent = soldRows.length;
-      if (importStatPendingCount) importStatPendingCount.textContent = pendingRows.length;
-      if (importStatListedCount) importStatListedCount.textContent = listedRows.length;
 
-      // Generar vista previa con desglose
       if (importPreviewList) {
-        importPreviewList.innerHTML = rowsToImport.map(r => {
-          let badgeHtml = '';
-          if (r.accepted === true) {
-            const pVal = r.sold_price !== null ? r.sold_price : (r.counter_offer !== null ? r.counter_offer : r.offer);
-            badgeHtml = `<span class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-semibold text-[10px]">Vendido: ${pVal} ${escapeHtml(r.sold_currency || 'TF2')}</span>`;
-          } else if (r.revised === true) {
-            const inc = r.increment !== null ? r.increment : 0;
-            badgeHtml = `<span class="px-2 py-0.5 rounded bg-purple-950/80 text-purple-300 border border-purple-700/60 font-semibold text-[10px]">En negociación (+${inc} TF2)</span>`;
-          } else {
-            badgeHtml = `<span class="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-700 font-semibold text-[10px]">Listado</span>`;
-          }
-
+        importPreviewList.innerHTML = rowsToImport.map((r, idx) => {
+          const displayCurr = r.currency || 'TF2';
+          const displayPrice = (displayCurr === 'EUR') ? `${Number(r.offer).toFixed(2)} €` : `${r.offer} TF2`;
           return `
-            <div class="flex items-center justify-between p-1.5 bg-slate-950/60 rounded-lg border border-slate-800/80 gap-2 hover:bg-slate-950 transition">
+            <div class="flex items-center justify-between p-2 bg-slate-950/80 rounded-xl border border-slate-800 gap-2 hover:border-slate-700 transition">
               <div class="flex items-center gap-2 truncate min-w-0">
-                <span class="text-slate-500 font-mono font-bold text-[10px]">#${r.game_id}</span>
-                <span class="text-slate-200 font-sans truncate font-medium text-xs">${escapeHtml(r.game_name || 'Juego')}</span>
-                ${r.buyer ? `<span class="text-slate-500 text-[10px]">(${escapeHtml(r.buyer)})</span>` : ''}
+                <span class="text-slate-500 font-mono font-bold text-[10px]">#${idx + 1}</span>
+                <span class="text-slate-200 font-sans truncate font-semibold text-xs">${escapeHtml(r.game_name || `Juego ${r.game_id}`)}</span>
+                ${r.buyer ? `<span class="text-indigo-400 font-sans text-[10px] bg-indigo-950/80 px-1.5 py-0.5 rounded border border-indigo-800/60">${escapeHtml(r.buyer)}</span>` : ''}
               </div>
               <div class="flex-shrink-0">
-                ${badgeHtml}
+                <span class="px-2 py-0.5 rounded-lg bg-amber-950/80 text-amber-300 border border-amber-700/60 font-mono font-bold text-xs">
+                  ${displayPrice}
+                </span>
               </div>
             </div>
           `;
         }).join('');
       }
 
-      // Mostrar modal de confirmación
-      if (modalConfirmImport) {
-        modalConfirmImport.classList.remove('hidden');
-        modalConfirmImport.classList.add('flex');
+      if (importPreviewContainer) importPreviewContainer.classList.remove('hidden');
+      if (btnApplyImportCsv) {
+        btnApplyImportCsv.disabled = false;
+        btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-check"></i> Importar ${rowsToImport.length} Ofertas`;
       }
     } catch (err) {
       console.error("Error parsing CSV", err);
@@ -2327,7 +2366,7 @@ async function applyImportCsv() {
 
   if (btnApplyImportCsv) {
     btnApplyImportCsv.disabled = true;
-    btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Aplicando...`;
+    btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Importando...`;
   }
 
   try {
@@ -2339,12 +2378,9 @@ async function applyImportCsv() {
 
     const resData = await response.json();
     if (response.ok && resData.status === 'ok') {
-      if (modalConfirmImport) {
-        modalConfirmImport.classList.add('hidden');
-        modalConfirmImport.classList.remove('flex');
-      }
-      pendingImportRows = [];
-      showToast(`¡Se importaron y aplicaron ${resData.updated_count} cambios con éxito!`, "success");
+      closeImportModal();
+      showToast(`¡Se importaron ${resData.updated_count} ofertas en "En negociación"!`, "success");
+      setTableFilter('pending');
       await initData();
     } else {
       showToast(resData.detail || 'Error al importar los datos del CSV.', "error");
@@ -2355,10 +2391,81 @@ async function applyImportCsv() {
   } finally {
     if (btnApplyImportCsv) {
       btnApplyImportCsv.disabled = false;
-      btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-check"></i> Aplicar e Importar Cambios`;
+      btnApplyImportCsv.innerHTML = `<i class="fa-solid fa-check"></i> Importar Ofertas`;
     }
   }
 }
+
+async function handleAcceptOffer(gameId) {
+  const game = allGamesList.find(g => String(g.id) === String(gameId)) || games.find(g => String(g.id) === String(gameId));
+  if (!game) return;
+
+  const offerVal = game.offer_price !== undefined && game.offer_price !== null ? Number(game.offer_price) : Number(game.tf2_keys_offered || 0);
+  const offerCurr = game.offer_currency || 'TF2';
+
+  try {
+    const res = await fetch(`/api/games/${gameId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'sold',
+        is_sold: true,
+        sold_price: offerVal,
+        sold_currency: offerCurr,
+        sold_note: `Oferta aceptada (${game.buyer_name || 'Comprador'})`
+      })
+    });
+
+    if (res.ok) {
+      showToast(`¡Oferta para "${game.name}" aceptada! Trasladado a Vendidos.`, "success");
+      await initData();
+    } else {
+      showToast("Error al aceptar la oferta.", "error");
+    }
+  } catch (err) {
+    console.error("Error accepting offer", err);
+    showToast("Error de conexión al aceptar la oferta.", "error");
+  }
+}
+
+async function handleDiscardOffer(gameId) {
+  const game = allGamesList.find(g => String(g.id) === String(gameId)) || games.find(g => String(g.id) === String(gameId));
+  if (!game) return;
+
+  if (!confirm(`¿Estás seguro de que deseas descartar la oferta para "${game.name}" y devolver el juego a Listados?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/games/${gameId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'listed',
+        is_sold: false,
+        offer_price: 0.0,
+        counter_price: 0.0,
+        buyer_name: null,
+        sold_price: null,
+        sold_note: null
+      })
+    });
+
+    if (res.ok) {
+      showToast(`Oferta para "${game.name}" descartada. Devuelto a Listados.`, "info");
+      await initData();
+    } else {
+      showToast("Error al descartar la oferta.", "error");
+    }
+  } catch (err) {
+    console.error("Error discarding offer", err);
+    showToast("Error de conexión al descartar la oferta.", "error");
+  }
+}
+
+// Asignar funciones globales para los botones de acción en tabla
+window.handleAcceptOffer = handleAcceptOffer;
+window.handleDiscardOffer = handleDiscardOffer;
 
 function showToast(msg, type = "success") {
   const toast = document.getElementById('toast-notify');
