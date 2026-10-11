@@ -1960,14 +1960,21 @@ function copyCounterOfferText() {
 }
 
 function exportToCsv() {
-  const listToExport = (games && games.length > 0) ? games : allGamesList;
+  const term = (searchInput ? searchInput.value : '').toLowerCase().trim();
+  let listToExport = (games && games.length > 0) ? games : allGamesList;
+  if (currentTableFilter === 'pending') {
+    listToExport = allGamesList.filter(g => g.status === 'pending');
+  }
+  if (term) {
+    listToExport = listToExport.filter(g => (g.name || '').toLowerCase().includes(term));
+  }
+
   if (!listToExport || listToExport.length === 0) {
     showToast("No hay juegos en la tabla para exportar.", "warning");
     return;
   }
 
   try {
-    // Formateador de números (usamos punto decimal estándar)
     const formatDecimal = (val) => {
       if (val === null || val === undefined || val === '') return '';
       const num = typeof val === 'number' ? val : parseFloat(val);
@@ -1975,26 +1982,79 @@ function exportToCsv() {
       return num.toString();
     };
 
-    // Cabeceras de la plantilla CSV alineadas con Game;Buyer;Offer;Currency
-    let csv = "Game;Buyer;Offer;Currency\r\n";
-    
-    listToExport.forEach(g => {
-      const cleanName = (g.name || '')
-        .replace(/;/g, ' - ')
-        .replace(/"/g, '""')
-        .trim();
-      const cleanBuyer = (g.buyer_name || '')
-        .replace(/;/g, ' - ')
-        .replace(/"/g, '""')
-        .trim();
+    let csv = "";
 
-      const offerVal = (g.offer_price !== undefined && g.offer_price !== null) ? Number(g.offer_price) : Number(g.tf2_keys_offered || 0);
-      const currency = g.offer_currency || 'TF2';
+    if (currentTableFilter === 'pending') {
+      csv = "ID;Juego;Bundle;Es o no artículo de coleccionista;Comprador;Jugadores últimas 24h;Mínimo actual;Suelo mínimo;Oferta recibida;% de diferencia entre suelo mínimo y oferta recibida\r\n";
 
-      csv += `"${cleanName}";"${cleanBuyer}";${formatDecimal(offerVal)};"${currency}"\r\n`;
-    });
+      listToExport.forEach(g => {
+        const gameId = g.id || g.app_id || '';
+        const cleanName = (g.name || '').replace(/;/g, ' - ').replace(/"/g, '""').trim();
+        const cleanBundle = (g.bundle || '').replace(/;/g, ' - ').replace(/"/g, '""').trim();
+        const isCollector = (g.is_delisted_steam || g.is_delisted) ? 'Sí' : 'No';
+        const cleanBuyer = (g.buyer_name || '').replace(/;/g, ' - ').replace(/"/g, '""').trim();
+        const players24h = (typeof g.steam_players_24h === 'number') ? g.steam_players_24h : '';
 
-    // BOM UTF-8 (\uFEFF) para compatibilidad nativa con Microsoft Excel en español/Windows
+        const curPrices = [];
+        if (typeof g.ggdeals_current_keyshop === 'number' && g.ggdeals_current_keyshop > 0.05) curPrices.push(g.ggdeals_current_keyshop);
+        if (typeof g.best_keyshop_price_eur === 'number' && g.best_keyshop_price_eur > 0.05) curPrices.push(g.best_keyshop_price_eur);
+        if (typeof g.ggdeals_current_official === 'number' && g.ggdeals_current_official > 0.05) curPrices.push(g.ggdeals_current_official);
+        if (typeof g.steam_store_price === 'number' && g.steam_store_price > 0.05 && !g.is_delisted_steam) curPrices.push(g.steam_store_price);
+        const minCurrentEur = curPrices.length > 0 ? Math.min(...curPrices) : null;
+        let minCurrentText = '';
+        if (minCurrentEur !== null) {
+          const minCurrentTf2 = (minCurrentEur / tf2CashPrice);
+          minCurrentText = `${minCurrentTf2.toFixed(2)} TF2 (~${minCurrentEur.toFixed(2)} €)`;
+        }
+
+        const floorPriceEur = (typeof g.floor_price_eur === 'number') ? g.floor_price_eur : null;
+        let floorText = '';
+        if (floorPriceEur !== null) {
+          const floorTf2 = (floorPriceEur / tf2CashPrice);
+          floorText = `${floorTf2.toFixed(2)} TF2 (~${floorPriceEur.toFixed(2)} €)`;
+        }
+
+        const isEur = (g.offer_currency === 'EUR');
+        const offerVal = (g.offer_price !== undefined && g.offer_price !== null) ? Number(g.offer_price) : Number(g.tf2_keys_offered || 0);
+        const offerValEur = isEur ? offerVal : (offerVal * tf2CashPrice);
+        let offerReceivedText = '';
+        if (offerVal > 0) {
+          if (isEur) {
+            offerReceivedText = `${offerVal.toFixed(2)} €`;
+          } else {
+            offerReceivedText = `${offerVal} TF2 (~${offerValEur.toFixed(2)} €)`;
+          }
+        }
+
+        let diffPctText = '';
+        if (floorPriceEur !== null && floorPriceEur > 0 && offerVal > 0) {
+          const diffEur = offerValEur - floorPriceEur;
+          const diffPct = (diffEur / floorPriceEur) * 100;
+          diffPctText = `${diffPct >= 0 ? '+' : ''}${diffPct.toFixed(1)}%`;
+        }
+
+        csv += `${gameId};"${cleanName}";"${cleanBundle}";"${isCollector}";"${cleanBuyer}";${players24h};"${minCurrentText}";"${floorText}";"${offerReceivedText}";"${diffPctText}"\r\n`;
+      });
+    } else {
+      csv = "Game;Buyer;Offer;Currency\r\n";
+      
+      listToExport.forEach(g => {
+        const cleanName = (g.name || '')
+          .replace(/;/g, ' - ')
+          .replace(/"/g, '""')
+          .trim();
+        const cleanBuyer = (g.buyer_name || '')
+          .replace(/;/g, ' - ')
+          .replace(/"/g, '""')
+          .trim();
+
+        const offerVal = (g.offer_price !== undefined && g.offer_price !== null) ? Number(g.offer_price) : Number(g.tf2_keys_offered || 0);
+        const currency = g.offer_currency || 'TF2';
+
+        csv += `"${cleanName}";"${cleanBuyer}";${formatDecimal(offerVal)};"${currency}"\r\n`;
+      });
+    }
+
     const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
